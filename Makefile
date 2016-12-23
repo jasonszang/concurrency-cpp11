@@ -1,22 +1,22 @@
 CXXFLAGS =	-g -O2 -Wall -fmessage-length=0 --std=c++11
 
-#HEADERS =   $(wildcard demo_forward_declaration/*.h)
-HEADERS =   
+HEADERS =   $(wildcard test/*.h)
+HEADERS +=  $(wildcard concurrency/*.h)
 
-#OBJS =		$(patsubst %.cpp, %.o, $(wildcard demo_forward_declaration/*.cpp)) 
 OBJS =      main.o
+OBJS +=     $(patsubst %.cpp, %.o, $(wildcard test/*.cpp))
 
 LIBS =
 
-TARGET =	jason_util.exe
+TARGET =	main.exe
+
+.PHONY: all
+all:	$(TARGET)
 
 $(OBJS): $(HEADERS)
 
 $(TARGET):	$(OBJS) $(HEADERS)
 	$(CXX) --std=c++11 -o $(TARGET) $(OBJS) $(LIBS)
-
-.PHONY: all
-all:	$(TARGET)
 
 .PHONY: run
 run:    $(TARGET)
