@@ -1,4 +1,4 @@
-CXXFLAGS =	-g -O2 -Wall -fmessage-length=0 --std=c++11
+CXXFLAGS =	-g -O2 -Wall -fmessage-length=0 --std=c++11 -D_GNU_SOURCE
 
 HEADERS =   $(wildcard test/*.h)
 HEADERS +=  $(wildcard concurrency/*.h)

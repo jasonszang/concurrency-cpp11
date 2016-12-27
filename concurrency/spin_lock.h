@@ -10,13 +10,14 @@
 
 #include <atomic>
 #include <cstdio>
+#include <pthread.h>
 
 namespace ttb {
 
 static const uint_fast16_t SPIN_CYCLES_BEFORE_YIELD = 20000;
 
 /**
- * @brief A simple spin lock that satisfies LockAble.
+ * @brief A simple unfair spin lock that satisfies LockAble.
  */
 class SpinLock {
 public:
@@ -42,6 +43,36 @@ public:
 
 private:
     std::atomic_flag l = ATOMIC_FLAG_INIT;
+};
+
+/**
+ * @brief A thin-layer wrapper for pthread_spin
+ */
+class PthreadSpinLockWrapper {
+public:
+    PthreadSpinLockWrapper():l(new pthread_spinlock_t()) {
+        pthread_spin_init(l, PTHREAD_PROCESS_PRIVATE);
+    }
+
+    ~PthreadSpinLockWrapper() {
+        pthread_spin_destroy(l);
+        delete l;
+    }
+
+    void lock() {
+        pthread_spin_lock(l); // undefined if caller has the lock
+    }
+
+    void unlock() {
+        pthread_spin_unlock(l);
+    }
+
+    bool try_lock() {
+        return pthread_spin_trylock(l) == 0;
+    }
+
+private:
+    pthread_spinlock_t * const l;
 };
 
 } // namespace ttb
