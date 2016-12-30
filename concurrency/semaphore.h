@@ -5,8 +5,8 @@
  *      Author: jasonszang
  */
 
-#ifndef SEMAPHORE_H_
-#define SEMAPHORE_H_
+#ifndef CONCURRENCY_SEMAPHORE_H_
+#define CONCURRENCY_SEMAPHORE_H_
 
 #include <mutex>
 #include <chrono>
@@ -88,4 +88,4 @@ private:
 
 } // namespace ttb
 
-#endif /* SEMAPHORE_H_ */
+#endif /* CONCURRENCY_SEMAPHORE_H_ */
