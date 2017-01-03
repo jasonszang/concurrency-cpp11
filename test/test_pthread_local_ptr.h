@@ -10,7 +10,7 @@
 #include <chrono>
 #endif
 
-#include "../pthread_wrapper/pthread_specific_ptr.h"
+#include "../pthread_wrapper/pthread_local_ptr.h"
 
 namespace ttb {
 
@@ -18,6 +18,17 @@ namespace test {
 
 #if __cplusplus >= 201103L
 
+class PThreadLocalPtrCannotCreate {
+public:
+    PThreadLocalPtrCannotCreate(std::string &&rref) :
+            d(std::move(rref)) {
+    }
+    PThreadLocalPtrCannotCreate(const std::string &rhs) = delete;
+private:
+    std::string d;
+};
+
+// PThreadLocalPtr used as static member
 class StaticHolder {
 public:
     void print_address(int id) {
@@ -29,11 +40,20 @@ private:
 };
 PThreadLocalPtr<int> StaticHolder::sp;
 
+// Another layer of function calls
 void thread_func_internal(int id) {
-    static PThreadLocalPtr<int> pi;
+    std::string a="A";
+    static PThreadLocalPtr<std::pair<std::string, std::string>> pi(std::move(a), std::string("B"));
     printf("Thread id: %d, address of pi: %p\n", id, pi.get());
+    printf("pi = (%s, %s), a=%s\n", pi->first.c_str(), pi->second.c_str(), a.c_str());
+           // only a, b in the first thread will be moved since static only get
+           // initialized once
+
     StaticHolder sh;
     sh.print_address(id);
+
+    // static PThreadLocalPtr<PThreadLocalPtrCannotCreate> wontcompile1;
+    // static PThreadLocalPtr<PThreadLocalPtrCannotCreate> wontcompile2(std::string("foo"));
 }
 
 void thread_func(int id) {
