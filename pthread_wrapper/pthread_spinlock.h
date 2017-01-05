@@ -15,16 +15,19 @@ namespace ttb {
 /**
  * @brief A thin-layer wrapper for pthread_spin, satisfies Lockable.
  */
-class PthreadSpinLockWrapper {
+class PThreadSpinLockWrapper {
 public:
-    PthreadSpinLockWrapper():l(new pthread_spinlock_t()) {
+    PThreadSpinLockWrapper() noexcept: l(new pthread_spinlock_t()) {
         pthread_spin_init(l, PTHREAD_PROCESS_PRIVATE);
     }
 
-    ~PthreadSpinLockWrapper() {
+    ~PThreadSpinLockWrapper() {
         pthread_spin_destroy(l);
         delete l;
     }
+
+    PThreadSpinLockWrapper(const PThreadSpinLockWrapper &rhs) = delete;
+    PThreadSpinLockWrapper &operator=(const PThreadSpinLockWrapper &rhs) = delete;
 
     void lock() {
         pthread_spin_lock(l); // undefined if caller has the lock
@@ -42,6 +45,7 @@ private:
     pthread_spinlock_t * const l;
 };
 
-} // namespace ttb
+}
+ // namespace ttb
 
 #endif /* PTHREAD_WRAPPER_PTHREAD_SPINLOCK_H_ */

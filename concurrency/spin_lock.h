@@ -23,6 +23,10 @@ static const uint_fast16_t SPIN_CYCLES_BEFORE_YIELD_FAIR = 500;
 class SpinLock {
 public:
 
+    SpinLock() noexcept = default;
+    SpinLock(const SpinLock &rhs) = delete;
+    SpinLock &operator=(const SpinLock &rhs) = delete;
+
     void lock(){
         uint_fast16_t patience = SPIN_CYCLES_BEFORE_YIELD;
         while(l.test_and_set(std::memory_order_acquire)) {
@@ -53,9 +57,12 @@ private:
  */
 class FairSpinLock {
 public:
-    FairSpinLock() :
-            next(0), active(0) {
+    FairSpinLock() noexcept:
+    next(0), active(0) {
     }
+
+    FairSpinLock(const FairSpinLock &rhs) = delete;
+    FairSpinLock &operator=(const FairSpinLock &rhs) = delete;
 
     void lock() {
         unsigned int ticket = next.fetch_add(1, std::memory_order_acq_rel);

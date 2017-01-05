@@ -22,15 +22,15 @@ namespace test {
 
 static int g = 1000000;
 ttb::SpinLock sl;
-ttb::PthreadSpinLockWrapper psw;
+ttb::PThreadSpinLockWrapper psw;
 ttb::FairSpinLock fsl;
 std::mutex m;
 
-inline void tf(int num) {
+inline void thread_function(int num) {
     for (int i = 0; i < num; ++i) {
-//        std::lock_guard<ttb::SpinLock> l(sl);
+        std::lock_guard<ttb::SpinLock> l(sl);
 //        std::lock_guard<ttb::FairSpinLock> l(fsl);
-        std::lock_guard<ttb::PthreadSpinLockWrapper> l(psw);
+//        std::lock_guard<ttb::PThreadSpinLockWrapper> l(psw);
 //        std::lock_guard<std::mutex> l(m);
         g -= 1;
         volatile int j = 500;
@@ -43,7 +43,7 @@ inline void tf(int num) {
 inline void test_spin_lock() {
     std::vector<std::thread> threads;
     for (int i = 0; i < 10; ++i) {
-        threads.emplace_back(&tf, 100000);
+        threads.emplace_back(&thread_function, 100000);
     }
     for (auto &thread : threads) {
         thread.join();
