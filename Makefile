@@ -1,4 +1,4 @@
-CXXFLAGS =	-g -O2 -Wall -fmessage-length=0 --std=c++14 -D_GNU_SOURCE
+CXXFLAGS =	-g -O2 -Wall -fmessage-length=0 --std=c++11 -D_GNU_SOURCE
 
 HEADERS =   $(wildcard test/*.h)
 HEADERS +=  $(wildcard concurrency/*.h)
@@ -16,7 +16,7 @@ all:	$(TARGET)
 $(OBJS): $(HEADERS)
 
 $(TARGET):	$(OBJS) $(HEADERS)
-	$(CXX) --std=c++14 -o $(TARGET) $(OBJS) $(LIBS)
+	$(CXX) --std=c++11 -o $(TARGET) $(OBJS) $(LIBS)
 
 .PHONY: run
 run:    $(TARGET)
