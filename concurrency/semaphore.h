@@ -11,6 +11,7 @@
 #include <mutex>
 #include <chrono>
 #include <condition_variable>
+#include "spin_lock.h"
 
 namespace ttb {
 
@@ -26,7 +27,7 @@ public:
     }
 
     void acquire(unsigned int permits) {
-        std::unique_lock<std::mutex> ul(mtx);
+        std::unique_lock<ttb::SpinLock> ul(mtx);
         while (count < (int) permits) {
             cv.wait(ul);
         }
@@ -39,17 +40,10 @@ public:
 
     void release(unsigned int permits) {
         {
-            std::lock_guard<std::mutex> lock(mtx);
+            std::lock_guard<ttb::SpinLock> lock(mtx);
             count += permits;
         }
-        cv.notify_all(); // Attention: thundering herd
-
-        // Thundering herd can be avoided by keeping track all waiting acquires and notify one by one
-        // until the amount of permits gets depleted. However this result in awaking 1/2 of waiting
-        // threads on average, and the cost in maintaining required data structures might make this
-        // optimization ineffective.
-        // Another strategy is let threads wait on different condition_variables to provide a mechanic
-        // for waking specific threads, then implement an algorithm to select threads to wake.
+        cv.notify_one();
     }
 
     bool try_acquire() {
@@ -61,7 +55,7 @@ public:
     }
 
     bool try_acquire(unsigned int permits, uint32_t timeout_us) {
-        std::unique_lock<std::mutex> ul(mtx);
+        std::unique_lock<ttb::SpinLock> ul(mtx);
         auto until = std::chrono::steady_clock::now() + std::chrono::microseconds(timeout_us);
         while (count < (int) permits){
             if (cv.wait_until(ul, until) == std::cv_status::timeout){
@@ -73,7 +67,7 @@ public:
     }
 
     int available_permits() {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<ttb::SpinLock> lock(mtx);
         return count;
     }
 
@@ -81,8 +75,8 @@ public:
     void operator =(const Semaphore &rhs) = delete;
 
 private:
-    std::mutex mtx;
-    std::condition_variable cv;
+    ttb::SpinLock mtx;
+    std::condition_variable_any cv;
     int32_t count;
 };
 
