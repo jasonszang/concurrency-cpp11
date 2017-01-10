@@ -68,7 +68,6 @@ public:
             cur->prev = tail;
             tail = cur;
         }
-//        printf("enqueued, nodes waiting now = %d\n", num_waiting_nodes());
         return cur;
     }
 
@@ -76,7 +75,6 @@ public:
      * Dequeue WaitNode at head of the queue, returning it to the cache.
      */
     void dequeue() {
-//        printf("dequeueing, nodes waiting now = %d\n", num_waiting_nodes());
         remove(head);
     }
 
@@ -200,9 +198,7 @@ private: // private
 
     bool try_acquire0(bool timed, unsigned long millis, unsigned int micros) {
         std::unique_lock<ttb::SpinLock> lock(main_lock);
-//        printf("Acquiring, permits now = %d\n", permits);
         if (permits >= 1 && queue.is_empty()) {
-//            printf("Successfully fast-acquired, permits left = %d\n", permits);
             permits -= 1;
             return true;
         }
@@ -239,7 +235,6 @@ private: // private
         if (permits >= 1) {
             queue.wake_head(); // propogate waking signal if there are permits left now
         }
-//        printf("Successfully acquired, permits left = %d\n", permits);
         if (permits < 0) {
             printf("BOOM!");
             std::terminate(); // BOOM when something went very wrong. Will be removed later.
