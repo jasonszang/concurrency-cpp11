@@ -43,8 +43,8 @@ public:
     WaitQueue &operator=(const WaitQueue &) = delete;
 
     /**
-     * Cause the calling thread to enter the waiting queue. May cause memory allocation when cached
-     * wait nodes are depleted.
+     * Enqueue a waiting node at the tail and return a pointer to it.
+     * May cause memory allocation when cached wait nodes are depleted.
      */
     WaitNode *enqueue() {
         if (!cache_head) {
@@ -148,19 +148,23 @@ public:
             return;
         }
 
-        WaitNode *wait_node = queue.enqueue();
-        wait_node->cv.wait(lock, [wait_node](){return wait_node->wakeable;});
-
-        // When waked current thread is at the head of the queue and permits >= 1
+        while (true) {
+            WaitNode *wait_node = queue.enqueue();
+            wait_node->cv.wait(lock, [wait_node](){return wait_node->wakeable;});
+            queue.dequeue();
+            if (permits >= 1) {
+                break;
+            }
+        }
+        // When control reaches here current thread is at the head of the queue and permits >= 1
         permits -= 1;
-        queue.dequeue();
         if (permits >= 1) {
-            queue.wake_head();
+            queue.wake_head(); // propogate waking signal if there are permits left now
         }
 //        printf("Successfully acquired, permits left = %d\n", permits);
         if (permits < 0) {
             printf("BOOM!");
-            std::terminate();
+            std::terminate(); // BOOM when something went very wrong. Will be removed later.
         }
     }
 
@@ -168,6 +172,19 @@ public:
         std::lock_guard<ttb::SpinLock> lock(main_lock);
         permits += 1;
         queue.wake_head(); // XXX
+    }
+
+    /**
+     * Untimed try_acquire. Note that untimed version of try_acquire is not fair.
+     */
+    bool try_acquire() {
+        std::lock_guard<ttb::SpinLock> lock(main_lock);
+        if (permits >= 1) {
+            permits -= 1;
+            return true;
+        } else {
+            return false;
+        }
     }
 
 private: // private

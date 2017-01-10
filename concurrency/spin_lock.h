@@ -14,8 +14,8 @@
 
 namespace ttb {
 
-static const uint_fast16_t SPIN_CYCLES_BEFORE_YIELD = 20000;
-static const uint_fast16_t SPIN_CYCLES_BEFORE_YIELD_FAIR = 500;
+static const uint_fast16_t SPIN_CYCLES_BEFORE_YIELD = 100;
+static const uint_fast16_t SPIN_CYCLES_BEFORE_YIELD_FAIR = 100;
 
 /**
  * @brief A simple unfair spin lock that satisfies Lockable.
