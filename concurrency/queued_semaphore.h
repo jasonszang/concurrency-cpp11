@@ -6,12 +6,14 @@
 
 #include <condition_variable>
 #include "spin_lock.h"
+#include "../pthread_wrapper/pthread_spinlock.h"
 
 namespace ttb {
 
 struct WaitNode {
     std::condition_variable_any cv;
     bool wakeable = false;
+    WaitNode *prev = nullptr;
     WaitNode *next = nullptr;
 };
 
@@ -53,16 +55,19 @@ public:
         }
         WaitNode *cur = cache_head;
         cache_head = cache_head->next;
+
         cur->wakeable = false;
+        // cur->prev = nullptr; // already guaranteed
         cur->next = nullptr;
         if (!tail) {
             head = cur;
             tail = cur;
         } else {
             tail->next = cur;
+            cur->prev = tail;
             tail = cur;
         }
-//        printf("enqueueing, nodes waiting now = %d\n", num_waiting_nodes());
+//        printf("enqueued, nodes waiting now = %d\n", num_waiting_nodes());
         return cur;
     }
 
@@ -71,17 +76,37 @@ public:
      */
     void dequeue() {
 //        printf("dequeueing, nodes waiting now = %d\n", num_waiting_nodes());
-        if (!head) {
-//            printf("WARNING: head = nullptr in dequeue()");
-            return; // waiting queue empty, just return;
+        remove(head);
+    }
+
+    /**
+     * Remove a WaitNode from the queue and return it to the cache. Undefined behaviour if node is
+     * not already in the queue. Do nothing if node is nullptr.
+     */
+    void remove(WaitNode *node) {
+        if (!node) {
+            return;
         }
-        WaitNode *cur = head;
-        head = head->next;
-        if (tail == cur) {
+        if (node == head && head == tail) {
+            head = nullptr;
             tail = nullptr;
+        } // handle special condition in which the last node is removed from the queue
+        if (node == head) {
+            head = node->next;
         }
-        cur->next = cache_head;
-        cache_head = cur;
+        if (node == tail) {
+            tail = node->prev;
+        }
+        if (node->prev) {
+            node->prev->next = node->next;
+        }
+        if (node->next) {
+            node->next->prev = node->prev;
+        }
+
+        node->prev = nullptr;
+        node->next = cache_head;
+        cache_head = node;
     }
 
     /**
@@ -123,9 +148,13 @@ private:
         }
     }
 
+    // Doubly linked list as the waiting queue
     WaitNode *head = nullptr;
     WaitNode *tail = nullptr;
+
+    // **Forward** linked list of cached nodes
     WaitNode *cache_head = nullptr;
+
     size_t cur_queue_capacity = 256;
 };
 
