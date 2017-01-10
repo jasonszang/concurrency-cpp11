@@ -4,6 +4,7 @@
 #ifndef CONCURRENCY_QUEUED_SEMAPHORE_H_
 #define CONCURRENCY_QUEUED_SEMAPHORE_H_
 
+#include <chrono>
 #include <condition_variable>
 #include "spin_lock.h"
 #include "../pthread_wrapper/pthread_spinlock.h"
@@ -169,32 +170,7 @@ public:
     }
 
     void acquire() {
-        std::unique_lock<ttb::SpinLock> lock(main_lock);
-//        printf("Acquiring, permits now = %d\n", permits);
-        if (permits >= 1 && queue.is_empty()) {
-//            printf("Successfully fast-acquired, permits left = %d\n", permits);
-            permits -= 1;
-            return;
-        }
-
-        while (true) {
-            WaitNode *wait_node = queue.enqueue();
-            wait_node->cv.wait(lock, [wait_node](){return wait_node->wakeable;});
-            queue.dequeue();
-            if (permits >= 1) {
-                break;
-            }
-        }
-        // When control reaches here current thread is at the head of the queue and permits >= 1
-        permits -= 1;
-        if (permits >= 1) {
-            queue.wake_head(); // propogate waking signal if there are permits left now
-        }
-//        printf("Successfully acquired, permits left = %d\n", permits);
-        if (permits < 0) {
-            printf("BOOM!");
-            std::terminate(); // BOOM when something went very wrong. Will be removed later.
-        }
+        try_acquire0(false, 0, 0);
     }
 
     void release() {
@@ -216,7 +192,62 @@ public:
         }
     }
 
+    bool try_acquire(unsigned long millis, unsigned int micros) {
+        return try_acquire0(true, millis, micros);
+    }
+
 private: // private
+
+    bool try_acquire0(bool timed, unsigned long millis, unsigned int micros) {
+        std::unique_lock<ttb::SpinLock> lock(main_lock);
+//        printf("Acquiring, permits now = %d\n", permits);
+        if (permits >= 1 && queue.is_empty()) {
+//            printf("Successfully fast-acquired, permits left = %d\n", permits);
+            permits -= 1;
+            return true;
+        }
+
+        if (!timed) {
+            while (true) {
+                WaitNode *wait_node = queue.enqueue();
+                wait_node->cv.wait(lock, [wait_node]() {return wait_node->wakeable;});
+                queue.dequeue();
+                if (permits >= 1) {
+                    break;
+                }
+            }
+        } else {
+            std::chrono::steady_clock::time_point until = std::chrono::steady_clock::now() +
+                    std::chrono::milliseconds(millis) + std::chrono::microseconds(micros);
+            while (true) {
+                WaitNode *wait_node = queue.enqueue();
+                bool timeout = !(wait_node->cv.wait_until(lock, until,
+                        [wait_node]() {return wait_node->wakeable;}));
+                if (timeout) {
+                    queue.remove(wait_node);
+                    return false;
+                }
+                queue.dequeue();
+                if (permits >= 1) {
+                    break;
+                }
+            }
+        }
+
+        // When control reaches here current thread is at the head of the queue and permits >= 1
+        permits -= 1;
+        if (permits >= 1) {
+            queue.wake_head(); // propogate waking signal if there are permits left now
+        }
+//        printf("Successfully acquired, permits left = %d\n", permits);
+        if (permits < 0) {
+            printf("BOOM!");
+            std::terminate(); // BOOM when something went very wrong. Will be removed later.
+        }
+
+        return true;
+    }
+
     int permits = 0;
     ttb::SpinLock main_lock;
     WaitQueue queue;
