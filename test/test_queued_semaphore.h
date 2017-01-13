@@ -15,7 +15,7 @@ namespace ttb {
 
 namespace test {
 
-void thread_func_b(ttb::BasicQueuedSemaphore *bqs, int id) {
+void thread_func_b(ttb::BasicQueuedSemaphore<ttb::SpinLock> *bqs, int id) {
     for (int i = 0; i < 100; ++i) {
 //        printf("Acquiring\n");
         bqs->acquire();
@@ -29,12 +29,12 @@ void thread_func_b(ttb::BasicQueuedSemaphore *bqs, int id) {
 //        printf("Releasing\n");
         bqs->release();
     }
-//    printf("Blocking thread %d out\n", id);
+    printf("Blocking thread %d out\n", id);
 }
 
-void thread_func_nb(ttb::BasicQueuedSemaphore *bqs, int id) {
+void thread_func_nb(ttb::BasicQueuedSemaphore<ttb::SpinLock> *bqs, int id) {
     for (int i = 0; i < 100; ++i) {
-        while (!bqs->try_acquire(10, 0))
+        while (!bqs->try_acquire_for(10, 0))
             ;
 
 //        volatile int j;
@@ -44,28 +44,28 @@ void thread_func_nb(ttb::BasicQueuedSemaphore *bqs, int id) {
 
         bqs->release();
     }
-//    printf("Non-blocking thread %d out\n", id);
+    printf("Non-blocking thread %d out\n", id);
 }
 
 void test_queued_semaphore() {
-    static const int NUM_THREADS = 512;
+    static const int NUM_THREADS = 256;
     auto start = std::chrono::system_clock::now();
-    ttb::BasicQueuedSemaphore bqs(64);
+    ttb::BasicQueuedSemaphore<ttb::SpinLock> bqs(64);
     std::vector<std::thread> blocking_threads;
     for (int i = 0; i < NUM_THREADS; ++i) {
         blocking_threads.emplace_back(thread_func_b, &bqs, i);
     }
-//    std::vector<std::thread> non_blocking_threads;
-//    for (int i = NUM_THREADS; i < NUM_THREADS * 2; ++i) {
-//        non_blocking_threads.emplace_back(thread_func_nb, &bqs, i);
-//    }
+    std::vector<std::thread> non_blocking_threads;
+    for (int i = NUM_THREADS; i < NUM_THREADS * 2; ++i) {
+        non_blocking_threads.emplace_back(thread_func_nb, &bqs, i);
+    }
 
     for (int i = 0; i < NUM_THREADS; ++i) {
         blocking_threads[i].join();
     }
-//    for (int i = 0; i < NUM_THREADS; ++i) {
-//        non_blocking_threads[i].join();
-//    }
+    for (int i = 0; i < NUM_THREADS; ++i) {
+        non_blocking_threads[i].join();
+    }
 
     auto end = std::chrono::system_clock::now();
     std::chrono::duration<float> elapsed_seconds = end - start;

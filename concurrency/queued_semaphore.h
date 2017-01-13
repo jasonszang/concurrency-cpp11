@@ -6,13 +6,17 @@
 
 #include <chrono>
 #include <condition_variable>
+#include <type_traits>
 #include "spin_lock.h"
 #include "../pthread_wrapper/pthread_spinlock.h"
 
 namespace ttb {
 
+template<class LockType>
 struct WaitNode {
-    std::condition_variable_any cv;
+    typename std::conditional<std::is_same<LockType, std::mutex>::value,
+            std::condition_variable,
+            std::condition_variable_any>::type cv;
     bool wakeable = false;
     WaitNode *prev = nullptr;
     WaitNode *next = nullptr;
@@ -22,6 +26,7 @@ struct WaitNode {
  * Implementation of the thread waiting queue, a cached linked list of waiting nodes. This class
  * is not thread safe and should be protected by the outer semaphore.
  */
+template<class LockType>
 class WaitQueue {
 public:
 
@@ -31,12 +36,12 @@ public:
 
     ~WaitQueue() {
         while (head) {
-            WaitNode *next = head->next;
+            WaitNode<LockType> *next = head->next;
             delete head;
             head = next;
         }
         while (cache_head) {
-            WaitNode *next = cache_head->next;
+            WaitNode<LockType> *next = cache_head->next;
             delete cache_head;
             cache_head = next;
         }
@@ -49,12 +54,12 @@ public:
      * Enqueue a waiting node at the tail and return a pointer to it.
      * May cause memory allocation when cached wait nodes are depleted.
      */
-    WaitNode *enqueue() {
+    WaitNode<LockType> *enqueue() {
         if (!cache_head) {
             alloc_cache();
             cur_queue_capacity <<= 1;
         }
-        WaitNode *cur = cache_head;
+        WaitNode<LockType> *cur = cache_head;
         cache_head = cache_head->next;
 
         cur->wakeable = false;
@@ -82,7 +87,7 @@ public:
      * Remove a WaitNode from the queue and return it to the cache. Undefined behaviour if node is
      * not already in the queue. Do nothing if node is nullptr.
      */
-    void remove(WaitNode *node) {
+    void remove(WaitNode<LockType> *node) {
         if (!node) {
             return;
         }
@@ -128,7 +133,7 @@ public:
             return 0;
         } else {
             int ctr = 0;
-            WaitNode *p = head;
+            WaitNode<LockType> *p = head;
             while (p) {
                 ctr += 1;
                 p = p->next;
@@ -141,22 +146,23 @@ private:
 
     void alloc_cache() {
         for (size_t i = 0; i < cur_queue_capacity; ++i) {
-            WaitNode *cur = new WaitNode();
+            WaitNode<LockType> *cur = new WaitNode<LockType>();
             cur->next = cache_head;
             cache_head = cur;
         }
     }
 
     // Doubly linked list as the waiting queue
-    WaitNode *head = nullptr;
-    WaitNode *tail = nullptr;
+    WaitNode<LockType> *head = nullptr;
+    WaitNode<LockType> *tail = nullptr;
 
     // **Forward** linked list of cached nodes
-    WaitNode *cache_head = nullptr;
+    WaitNode<LockType> *cache_head = nullptr;
 
     size_t cur_queue_capacity = 256;
 };
 
+template <class LockType>
 class BasicQueuedSemaphore {
 public:
     BasicQueuedSemaphore() :
@@ -168,7 +174,9 @@ public:
     }
 
     void acquire() {
-        try_acquire0(false, 0, 0);
+        try_acquire0(false,
+                (std::chrono::time_point<std::chrono::steady_clock,
+                        std::chrono::microseconds>*) nullptr);
     }
 
     void release() {
@@ -190,13 +198,29 @@ public:
         }
     }
 
-    bool try_acquire(unsigned long millis, unsigned int micros) {
-        return try_acquire0(true, millis, micros);
+    bool try_acquire_for(unsigned long millis, unsigned int micros) {
+        std::chrono::steady_clock::time_point timeout_time = std::chrono::steady_clock::now() +
+                std::chrono::milliseconds(millis) + std::chrono::microseconds(micros);
+        return try_acquire0(true, &timeout_time);
     }
 
-private: // private
+    template<class Rep, class Period>
+    bool try_acquire_for(const std::chrono::duration<Rep, Period>& timeout_duration) {
+        std::chrono::steady_clock::time_point timeout_time = std::chrono::steady_clock::now() +
+                timeout_duration;
+        return try_acquire0(true, &timeout_time);
+    }
 
-    bool try_acquire0(bool timed, unsigned long millis, unsigned int micros) {
+    template<class Clock, class Duration>
+    bool try_acquire_until(const std::chrono::time_point<Clock, Duration> &timeout_time) {
+        return try_acquire0(true, &timeout_time);
+    }
+
+private:
+    // private
+
+    template<class Clock, class Duration>
+    bool try_acquire0(bool timed, const std::chrono::time_point<Clock, Duration> *timeout_time) {
         std::unique_lock<ttb::SpinLock> lock(main_lock);
         if (permits >= 1 && queue.is_empty()) {
             permits -= 1;
@@ -205,7 +229,7 @@ private: // private
 
         if (!timed) {
             while (true) {
-                WaitNode *wait_node = queue.enqueue();
+                WaitNode<LockType> *wait_node = queue.enqueue();
                 wait_node->cv.wait(lock, [wait_node]() {return wait_node->wakeable;});
                 queue.dequeue();
                 if (permits >= 1) {
@@ -213,11 +237,9 @@ private: // private
                 }
             }
         } else {
-            std::chrono::steady_clock::time_point until = std::chrono::steady_clock::now() +
-                    std::chrono::milliseconds(millis) + std::chrono::microseconds(micros);
             while (true) {
-                WaitNode *wait_node = queue.enqueue();
-                bool timeout = !(wait_node->cv.wait_until(lock, until,
+                WaitNode<LockType> *wait_node = queue.enqueue();
+                bool timeout = !(wait_node->cv.wait_until(lock, *timeout_time,
                         [wait_node]() {return wait_node->wakeable;}));
                 if (timeout) {
                     queue.remove(wait_node);
@@ -244,8 +266,8 @@ private: // private
     }
 
     int permits = 0;
-    ttb::SpinLock main_lock;
-    WaitQueue queue;
+    LockType main_lock;
+    WaitQueue<LockType> queue;
 };
 
 } // namespace ttb
