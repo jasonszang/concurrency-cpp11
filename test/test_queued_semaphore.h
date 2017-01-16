@@ -8,7 +8,6 @@
 #include <chrono>
 #include <thread>
 #include <vector>
-#include "../concurrency/queued_semaphore.h"
 #include "../concurrency/semaphore.h"
 
 namespace ttb {
