@@ -6,6 +6,7 @@
 
 #include <chrono>
 #include <condition_variable>
+#include <map>
 #include <type_traits>
 #include "spin_lock.h"
 #include "../pthread_wrapper/pthread_spinlock.h"
@@ -174,24 +175,38 @@ public:
     }
 
     void acquire() {
-        try_acquire0(false,
+        acquire(1);
+    }
+
+    void acquire(unsigned int request) {
+        try_acquire0(false, request,
                 (std::chrono::time_point<std::chrono::steady_clock,
                         std::chrono::microseconds>*) nullptr);
     }
 
     void release() {
-        std::lock_guard<ttb::SpinLock> lock(main_lock);
-        permits += 1;
-        queue.wake_head(); // XXX
+        release(1);
+    }
+
+    void release(unsigned int request) {
+        std::lock_guard<LockType> lock(main_lock);
+        permits += request;
+        if (permits >= request_record_min()) {
+            queue.wake_head();
+        }
     }
 
     /**
      * Untimed try_acquire. Note that untimed version of try_acquire is not fair.
      */
     bool try_acquire() {
-        std::lock_guard<ttb::SpinLock> lock(main_lock);
-        if (permits >= 1) {
-            permits -= 1;
+        return try_acquire(1);
+    }
+
+    bool try_acquire(unsigned int request) {
+        std::lock_guard<LockType> lock(main_lock);
+        if (permits >= request) {
+            permits -= request;
             return true;
         } else {
             return false;
@@ -199,40 +214,63 @@ public:
     }
 
     bool try_acquire_for(unsigned long millis, unsigned int micros) {
+        return try_acquire_for(1, millis, micros);
+    }
+
+    bool try_acquire_for(unsigned int request, unsigned long millis, unsigned int micros) {
         std::chrono::steady_clock::time_point timeout_time = std::chrono::steady_clock::now() +
                 std::chrono::milliseconds(millis) + std::chrono::microseconds(micros);
-        return try_acquire0(true, &timeout_time);
+        return try_acquire0(true, request, &timeout_time);
     }
 
     template<class Rep, class Period>
     bool try_acquire_for(const std::chrono::duration<Rep, Period>& timeout_duration) {
+        return try_acquire_for(1, timeout_duration);
+    }
+
+    template<class Rep, class Period>
+    bool try_acquire_for(unsigned int request,
+                         const std::chrono::duration<Rep, Period>& timeout_duration) {
         std::chrono::steady_clock::time_point timeout_time = std::chrono::steady_clock::now() +
                 timeout_duration;
-        return try_acquire0(true, &timeout_time);
+        return try_acquire0(true, request, &timeout_time);
     }
 
     template<class Clock, class Duration>
     bool try_acquire_until(const std::chrono::time_point<Clock, Duration> &timeout_time) {
+        return try_acquire_until(1, &timeout_time);
+    }
+
+    template<class Clock, class Duration>
+    bool try_acquire_until(unsigned int request,
+                           const std::chrono::time_point<Clock, Duration> &timeout_time) {
         return try_acquire0(true, &timeout_time);
     }
 
+    int available_permits() {
+        std::lock_guard<LockType> lock(main_lock);
+        return permits;
+    }
+
 private:
-    // private
 
     template<class Clock, class Duration>
-    bool try_acquire0(bool timed, const std::chrono::time_point<Clock, Duration> *timeout_time) {
-        std::unique_lock<ttb::SpinLock> lock(main_lock);
-        if (permits >= 1 && queue.is_empty()) {
-            permits -= 1;
+    bool try_acquire0(bool timed, unsigned int request,
+                      const std::chrono::time_point<Clock, Duration> *timeout_time) {
+        std::unique_lock<LockType> lock(main_lock);
+//        printf("permits before acquire: %d\n", permits);
+        if (permits >= (int) request && queue.is_empty()) {
+            permits -= request;
             return true;
         }
 
+        request_record_insert(request);
         if (!timed) {
             while (true) {
                 WaitNode<LockType> *wait_node = queue.enqueue();
                 wait_node->cv.wait(lock, [wait_node]() {return wait_node->wakeable;});
                 queue.dequeue();
-                if (permits >= 1) {
+                if (permits >= (int) request) {
                     break;
                 }
             }
@@ -246,15 +284,17 @@ private:
                     return false;
                 }
                 queue.dequeue();
-                if (permits >= 1) {
+                if (permits >= (int) request) {
                     break;
                 }
             }
         }
+        request_record_remove(request);
 
-        // When control reaches here current thread is at the head of the queue and permits >= 1
-        permits -= 1;
-        if (permits >= 1) {
+        // When control reaches here current thread is at the head of the queue and
+        // permits are enough
+        permits -= request;
+        if (permits >= request_record_min()) {
             queue.wake_head(); // propogate waking signal if there are permits left now
         }
         if (permits < 0) {
@@ -265,9 +305,38 @@ private:
         return true;
     }
 
+    void request_record_insert(unsigned int request) {
+        auto iter = request_record.find(request);
+        if (iter != request_record.end()) {
+            iter->second += 1;
+        } else {
+            request_record.emplace(request, 1);
+        }
+    }
+
+    void request_record_remove(unsigned int request) {
+        auto iter = request_record.find(request);
+        if (iter != request_record.end()) {
+            if (iter->second == 1) {
+                request_record.erase(iter);
+            } else {
+                iter->second -= 1;
+            }
+        }
+    }
+
+    int request_record_min() {
+        if (request_record.begin() != request_record.end()) {
+            return request_record.begin()->first;
+        } else {
+            return 0;
+        }
+    }
+
     int permits = 0;
     LockType main_lock;
     WaitQueue<LockType> queue;
+    std::map<unsigned int, std::size_t> request_record;
 };
 
 } // namespace ttb
