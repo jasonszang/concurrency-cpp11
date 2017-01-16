@@ -27,7 +27,7 @@ static const int THREAD_NUMBER = 100;
 
 class ThreadFunctor {
 public:
-    ThreadFunctor(int id, Semaphore<std::mutex> *sem) :
+    ThreadFunctor(int id, SimpleSemaphore<std::mutex> *sem) :
             id(id), ctr(TICKS), sem(sem) {
     }
     void operator()() {
@@ -45,11 +45,11 @@ public:
 private:
     int id;
     int ctr;
-    Semaphore<std::mutex> *sem;
+    SimpleSemaphore<std::mutex> *sem;
 };
 
 void test_semaphore() {
-    Semaphore<std::mutex> *sem = new Semaphore<std::mutex>(THREAD_NUMBER);
+    SimpleSemaphore<std::mutex> *sem = new SimpleSemaphore<std::mutex>(THREAD_NUMBER);
     vector<unique_ptr<thread> > threads;
     for (int i = 0; i < THREAD_NUMBER; ++i) {
         ThreadFunctor func(i + 1, sem);

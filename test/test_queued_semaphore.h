@@ -8,6 +8,7 @@
 #include <chrono>
 #include <thread>
 #include <vector>
+
 #include "../concurrency/semaphore.h"
 
 namespace ttb {
@@ -49,7 +50,7 @@ void thread_func_nb(Semaphore *bqs, int id) {
 }
 
 void test_queued_semaphore() {
-    using SemaphoreType = ttb::BasicQueuedSemaphore<std::mutex>;
+    using SemaphoreType = ttb::QueuedSemaphore<std::mutex>;
     static const int NUM_THREADS = 512;
     auto start = std::chrono::system_clock::now();
     SemaphoreType bqs(64);

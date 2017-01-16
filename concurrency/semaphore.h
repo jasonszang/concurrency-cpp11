@@ -16,19 +16,19 @@
 
 namespace ttb {
 
-template <class LockType>
-class BasicQueuedSemaphore {
+template<class LockType>
+class QueuedSemaphore {
 public:
-    BasicQueuedSemaphore() :
-            BasicQueuedSemaphore(0) {
+    QueuedSemaphore() :
+            QueuedSemaphore(0) {
     }
 
-    explicit BasicQueuedSemaphore(int initial_permits) :
+    explicit QueuedSemaphore(int initial_permits) :
             permits(initial_permits) {
     }
 
-    BasicQueuedSemaphore(const BasicQueuedSemaphore&) = delete;
-    BasicQueuedSemaphore& operator=(const BasicQueuedSemaphore&) = delete;
+    QueuedSemaphore(const QueuedSemaphore&) = delete;
+    QueuedSemaphore& operator=(const QueuedSemaphore&) = delete;
 
     void acquire() {
         acquire(1);
@@ -343,15 +343,15 @@ private:
 };
 
 template<class LockType>
-class Semaphore {
+class SimpleSemaphore {
 public:
 
-    explicit Semaphore(int initial_permits) :
+    explicit SimpleSemaphore(int initial_permits) :
             count(initial_permits) {
     }
 
-    Semaphore(const Semaphore&) = delete;
-    Semaphore& operator=(const Semaphore&) = delete;
+    SimpleSemaphore(const SimpleSemaphore&) = delete;
+    SimpleSemaphore& operator=(const SimpleSemaphore&) = delete;
 
     void acquire() {
         acquire(1);
