@@ -174,6 +174,9 @@ public:
             permits(initial_permits) {
     }
 
+    BasicQueuedSemaphore(const BasicQueuedSemaphore&) = delete;
+    BasicQueuedSemaphore& operator=(const BasicQueuedSemaphore&) = delete;
+
     void acquire() {
         acquire(1);
     }

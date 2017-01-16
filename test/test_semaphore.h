@@ -27,15 +27,15 @@ static const int THREAD_NUMBER = 100;
 
 class ThreadFunctor {
 public:
-    ThreadFunctor(int id, Semaphore<ttb::SpinLock> *sem) :
+    ThreadFunctor(int id, Semaphore<std::mutex> *sem) :
             id(id), ctr(TICKS), sem(sem) {
     }
     void operator()() {
-        while (ctr>0) {
+        while (ctr > 0) {
             sem->acquire(id);
             printf("thread id:%d, tick counter %d, remaining sem %d\n",
-                   id, ctr--, sem->available_permits());
-            if (sem->available_permits()<0) {
+                    id, ctr--, sem->available_permits());
+            if (sem->available_permits() < 0) {
                 printf("ERROR! MINUS SEMAPHORES!!\n");
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -45,18 +45,18 @@ public:
 private:
     int id;
     int ctr;
-    Semaphore<ttb::SpinLock> *sem;
+    Semaphore<std::mutex> *sem;
 };
 
 void test_semaphore() {
-    Semaphore<ttb::SpinLock> *sem = new Semaphore<ttb::SpinLock>(THREAD_NUMBER);
+    Semaphore<std::mutex> *sem = new Semaphore<std::mutex>(THREAD_NUMBER);
     vector<unique_ptr<thread> > threads;
-    for(int i=0; i<THREAD_NUMBER; ++i) {
-        ThreadFunctor func(i+1, sem);
+    for (int i = 0; i < THREAD_NUMBER; ++i) {
+        ThreadFunctor func(i + 1, sem);
         thread* curThread = new thread(func);
         threads.push_back(unique_ptr<thread>(curThread));
     }
-    for (int i=0; i<THREAD_NUMBER; ++i) {
+    for (int i = 0; i < THREAD_NUMBER; ++i) {
         threads[i]->join();
     }
 }

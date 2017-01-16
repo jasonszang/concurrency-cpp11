@@ -23,6 +23,9 @@ public:
             count(initial_permits) {
     }
 
+    Semaphore(const Semaphore&) = delete;
+    Semaphore& operator=(const Semaphore&) = delete;
+
     void acquire() {
         acquire(1);
     }
@@ -100,9 +103,6 @@ public:
         return count;
     }
 
-    Semaphore(const Semaphore &rhs) = delete;
-    void operator =(const Semaphore &rhs) = delete;
-
 private:
     template<class Clock, class Duration>
     bool try_acquire0(unsigned int permits,
@@ -116,8 +116,11 @@ private:
         count -= permits;
         return true;
     }
+
     LockType mtx;
-    std::condition_variable_any cv;
+    typename std::conditional<std::is_same<LockType, std::mutex>::value,
+          std::condition_variable,
+          std::condition_variable_any>::type cv;
     int32_t count;
 };
 
