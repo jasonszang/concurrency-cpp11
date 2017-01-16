@@ -15,6 +15,7 @@
 
 namespace ttb {
 
+template<class LockType>
 class Semaphore {
 public:
 
@@ -26,48 +27,76 @@ public:
         acquire(1);
     }
 
-    void acquire(unsigned int permits) {
-        std::unique_lock<ttb::SpinLock> ul(mtx);
-        while (count < (int) permits) {
+    void acquire(unsigned int request) {
+        std::unique_lock<LockType> ul(mtx);
+        while (count < (int) request) {
             cv.wait(ul);
         }
-        count -= permits;
+        count -= request;
     }
 
     void release() {
         release(1);
     }
 
-    void release(unsigned int permits) {
+    void release(unsigned int request) {
         {
-            std::lock_guard<ttb::SpinLock> lock(mtx);
-            count += permits;
+            std::lock_guard<LockType> lock(mtx);
+            count += request;
         }
-        cv.notify_one();
+        cv.notify_all();
     }
 
     bool try_acquire() {
         return try_acquire(1);
     }
 
-    bool try_acquire(unsigned int permits) {
-        return try_acquire(permits, 0);
+    bool try_acquire(unsigned int request) {
+        std::lock_guard<LockType> lock(mtx);
+        if (count >= (int) request) {
+            count -= request;
+            return true;
+        } else {
+            return false;
+        }
     }
 
-    bool try_acquire(unsigned int permits, uint32_t timeout_us) {
-        std::unique_lock<ttb::SpinLock> ul(mtx);
-        auto until = std::chrono::steady_clock::now() + std::chrono::microseconds(timeout_us);
-        while (count < (int) permits){
-            if (cv.wait_until(ul, until) == std::cv_status::timeout){
-                return false;
-            }
-        }
-        count -= permits;
-        return true;
+    bool try_acquire_for(unsigned long millis, unsigned int micros) {
+        return try_acquire_for(1, millis, micros);
+    }
+
+    bool try_acquire_for(unsigned int request, unsigned long millis, unsigned int micros) {
+        std::chrono::steady_clock::time_point timeout_time = std::chrono::steady_clock::now() +
+                std::chrono::milliseconds(millis) + std::chrono::microseconds(micros);
+        return try_acquire0(request, timeout_time);
+    }
+
+    template<class Rep, class Period>
+    bool try_acquire_for(const std::chrono::duration<Rep, Period>& timeout_duration) {
+        return try_acquire_for(1, timeout_duration);
+    }
+
+    template<class Rep, class Period>
+    bool try_acquire_for(unsigned int request,
+                         const std::chrono::duration<Rep, Period>& timeout_duration) {
+        std::chrono::steady_clock::time_point timeout_time = std::chrono::steady_clock::now() +
+                timeout_duration;
+        return try_acquire0(request, timeout_time);
+    }
+
+    template<class Clock, class Duration>
+    bool try_acquire_until(const std::chrono::time_point<Clock, Duration> &timeout_time) {
+        return try_acquire_until(1, timeout_time);
+    }
+
+    template<class Clock, class Duration>
+    bool try_acquire_until(unsigned int request,
+                           const std::chrono::time_point<Clock, Duration> &timeout_time) {
+        return try_acquire0(true, timeout_time);
     }
 
     int available_permits() {
-        std::lock_guard<ttb::SpinLock> lock(mtx);
+        std::lock_guard<LockType> lock(mtx);
         return count;
     }
 
@@ -75,7 +104,19 @@ public:
     void operator =(const Semaphore &rhs) = delete;
 
 private:
-    ttb::SpinLock mtx;
+    template<class Clock, class Duration>
+    bool try_acquire0(unsigned int permits,
+                      const std::chrono::time_point<Clock, Duration> &timeout_time) {
+        std::unique_lock<LockType> ul(mtx);
+        while (count < (int) permits) {
+            if (cv.wait_until(ul, timeout_time) == std::cv_status::timeout) {
+                return false;
+            }
+        }
+        count -= permits;
+        return true;
+    }
+    LockType mtx;
     std::condition_variable_any cv;
     int32_t count;
 };

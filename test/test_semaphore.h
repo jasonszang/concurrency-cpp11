@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "../concurrency/semaphore.h"
+#include "../concurrency/spin_lock.h"
 
 namespace ttb {
 
@@ -26,7 +27,7 @@ static const int THREAD_NUMBER = 100;
 
 class ThreadFunctor {
 public:
-    ThreadFunctor(int id, Semaphore* sem) :
+    ThreadFunctor(int id, Semaphore<ttb::SpinLock> *sem) :
             id(id), ctr(TICKS), sem(sem) {
     }
     void operator()() {
@@ -44,11 +45,11 @@ public:
 private:
     int id;
     int ctr;
-    Semaphore* sem;
+    Semaphore<ttb::SpinLock> *sem;
 };
 
 void test_semaphore() {
-    Semaphore* sem = new Semaphore(THREAD_NUMBER);
+    Semaphore<ttb::SpinLock> *sem = new Semaphore<ttb::SpinLock>(THREAD_NUMBER);
     vector<unique_ptr<thread> > threads;
     for(int i=0; i<THREAD_NUMBER; ++i) {
         ThreadFunctor func(i+1, sem);
