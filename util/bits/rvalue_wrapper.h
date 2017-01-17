@@ -1,8 +1,10 @@
 /**
  * rvalue_wrapper.h
  */
-#ifndef UTIL_RVALUE_WRAPPER_H_
-#define UTIL_RVALUE_WRAPPER_H_
+#ifndef UTIL_BITS_RVALUE_WRAPPER_H_
+#define UTIL_BITS_RVALUE_WRAPPER_H_
+
+namespace ttb {
 
 /**
  * A wrapper for holding and passing rvalues through std::bind. The rvalue wrapped will be stored
@@ -29,12 +31,6 @@ private:
     T t;
 };
 
-namespace std {
-template<typename T>
-struct is_bind_expression<RValueWrapper<T>> : std::true_type {
-};
-}
-
 template<typename T,
         typename = typename std::enable_if<std::is_rvalue_reference<T&&>::value>::type>
 RValueWrapper<T> rval(T &&t) {
@@ -46,4 +42,12 @@ RValueWrapper<T> rval(T &t) {
     return RValueWrapper<T>(T(t));
 }
 
-#endif /* UTIL_RVALUE_WRAPPER_H_ */
+} // namespace ttb
+
+namespace std {
+template<typename T>
+struct is_bind_expression<ttb::RValueWrapper<T>> : std::true_type {
+};
+}
+
+#endif /* UTIL_BITS_RVALUE_WRAPPER_H_ */
