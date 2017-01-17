@@ -76,10 +76,12 @@ private:
 } // namespace detail
 
 typedef const detail::ScopeGuardBase& ScopeGuard;
+struct placeholder_t {
+};
 
 template<class Post>
-detail::ScopeGuardImpl<int, Post> make_scope_guard(Post&& post) {
-    return detail::ScopeGuardImpl<int, Post>(std::forward<Post>(post));
+detail::ScopeGuardImpl<placeholder_t, Post> make_scope_guard(Post&& post) {
+    return detail::ScopeGuardImpl<placeholder_t, Post>(std::forward<Post>(post));
 }
 
 template<class Pre, class Post>

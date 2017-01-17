@@ -4,6 +4,8 @@
 #ifndef UTIL_BITS_INVOKE_H_
 #define UTIL_BITS_INVOKE_H_
 
+#include "scope_guard.h"
+
 namespace ttb {
 
 // "Reimplement" C++17 std::invoke
@@ -94,43 +96,29 @@ auto invoke(F&& f, ArgTypes&&... args)
 
 // Some extra gadgets based on ttb::invoke()
 
-template <class Rep, class Period>
-class TimeGuard {
-public:
-    TimeGuard(std::chrono::duration<Rep, Period> *time_elapsed_to_write) :
-            time_begin(std::chrono::steady_clock::now()), time_elapsed_to_write(
-                    time_elapsed_to_write) {
+namespace detail {
+template<class Rep, class Period>
+struct TimerEndFunctor{
+    TimerEndFunctor(std::chrono::duration<Rep, Period>* dur) :
+            begin(std::chrono::steady_clock::now()), dur(dur) {
     }
-
-    TimeGuard(const TimeGuard&) = delete;
-    TimeGuard& operator=(const TimeGuard&) = delete;
-
-
-    TimeGuard(TimeGuard&& rhs) noexcept:
-    time_begin(rhs.time_begin), time_elapsed_to_write(rhs.time_elapsed_to_write) {
-        rhs.released = true;
+    void operator()() {
+        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        *dur = std::chrono::duration_cast<std::chrono::duration<Rep, Period>>(
+                            end - begin);
     }
-
-    TimeGuard& operator=(TimeGuard&& rhs) = delete;
-
-    ~TimeGuard() {
-        if (!released) {
-            std::chrono::steady_clock::time_point time_end = std::chrono::steady_clock::now();
-            *time_elapsed_to_write = std::chrono::duration_cast<std::chrono::duration<Rep, Period>>(
-                    time_end - time_begin);
-        }
-    }
-
-private:
-    bool released = false;
-    std::chrono::steady_clock::time_point time_begin;
-    std::chrono::duration<Rep, Period> *time_elapsed_to_write;
+    std::chrono::steady_clock::time_point begin;
+    std::chrono::duration<Rep, Period>* dur;
 };
 
-template <class Rep, class Period>
-TimeGuard<Rep, Period> make_time_guard(std::chrono::duration<Rep, Period> *time_elapsed) {
-    return TimeGuard<Rep, Period>(time_elapsed);
+
+template<class Rep, class Period>
+ScopeGuardImpl<placeholder_t, detail::TimerEndFunctor<Rep, Period>> make_time_guard(
+        std::chrono::duration<Rep, Period> *time_elapsed) {
+    return make_scope_guard(TimerEndFunctor<Rep, Period>(time_elapsed));
 }
+
+}  // namespace detail
 
 /**
  * Invokes a callable and records its execution time. The first parameter is a pointer to a
@@ -142,7 +130,7 @@ template <class Rep, class Period, class Callable, class ...Args>
 auto timed_invoke(std::chrono::duration<Rep, Period> *time_elapsed, Callable c, Args&& ...args)
     noexcept(noexcept(invoke(std::forward<Callable>(c), std::forward<Args>(args)...)))
  -> decltype(invoke(std::forward<Callable>(c), std::forward<Args>(args)...)) {
-    auto th = make_time_guard(time_elapsed);
+    ScopeGuard time_guard = detail::make_time_guard(time_elapsed);
     return invoke(std::forward<Callable>(c), std::forward<Args>(args)...);
 }
 
