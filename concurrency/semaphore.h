@@ -11,6 +11,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <type_traits>
 
@@ -449,6 +450,80 @@ private:
           std::condition_variable,
           std::condition_variable_any>::type cv;
     int32_t count;
+};
+
+/**
+ * A semaphore wrapper class that provides convenient RAII semaphore owning mechanism during a
+ * scoped block. Note that this can also be achieved by using SemaphoreLock with a std::lock_guard
+ * and the effect is equivalent.
+ */
+template<class SemType>
+class SemaphoreGuard {
+public:
+    using SemaphoreType = SemType;
+
+    explicit SemaphoreGuard(SemType& semaphore, unsigned int request) :
+            sem(semaphore), request(request) {
+        sem.acquire(request);
+    }
+
+    SemaphoreGuard(const SemaphoreGuard&) = delete;
+    SemaphoreGuard& operator=(const SemaphoreGuard&) = delete;
+
+    ~SemaphoreGuard() {
+        sem.release(request);
+    }
+
+private:
+    SemType& sem;
+    const unsigned int request;
+};
+
+/**
+ * A semaphore wrapper class that converts a semaphore (along with a fixed number of permit request)
+ * to a TimedLockable class which can then be used with standard library components like
+ * std::lock_guard and std::unique_lock.
+ */
+template<class SemType>
+class SemaphoreLock {
+public:
+    using SemaphoreType = SemType;
+
+    explicit SemaphoreLock(SemType& semaphore, unsigned int request) :
+            sem(semaphore), request(request) {
+    }
+
+    SemaphoreLock(const SemaphoreLock&) = delete;
+    SemaphoreLock& operator=(const SemaphoreLock&) = delete;
+
+    ~SemaphoreLock() {
+    }
+
+    void lock() {
+        sem.acquire(request);
+    }
+
+    void unlock() {
+        sem.release(request);
+    }
+
+    bool try_lock() {
+        return sem.try_acquire(request);
+    }
+
+    template<class Rep, class Period>
+    bool try_lock_for(const std::chrono::duration<Rep, Period>& timeout_duration) {
+        return sem.try_acquire_for(request, timeout_duration);
+    }
+
+    template<class Clock, class Duration>
+    bool try_lock_until(const std::chrono::time_point<Clock, Duration>& timeout_time) {
+        return sem.try_acquire_until(request, timeout_time);
+    }
+
+private:
+    SemType& sem;
+    const unsigned int request;
 };
 
 } // namespace ttb
