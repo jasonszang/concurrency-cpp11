@@ -13,6 +13,8 @@
 #include <type_traits>
 #endif
 
+namespace ttb {
+
 /**
  * A C++ wrapper utility for pthread_specific-based thread local storage that will make your life
  * a little easier with pre-C++11 thread local.
@@ -112,5 +114,7 @@ private:
     std::function<T*()> initializer_func;
 #endif
 };
+
+} // namespace ttb
 
 #endif /* PTHREAD_WRAPPER_PTHREAD_LOCAL_PTR_H_ */
