@@ -13,23 +13,24 @@ namespace ttb {
 
 namespace test {
 
-void reader_func(int id, std::mutex *sm, int* shared_data) {
+void reader_func(int id, ttb::SharedMutex *sm, int* shared_data) {
     for (int i = 0; i < 100; ++i) {
-        sm->lock();
+        ttb::SharedLock<ttb::SharedMutex> lock(*sm);
 //        printf("Reader %d\t, %d\n", id, *shared_data);
         std::this_thread::sleep_for(std::chrono::microseconds(100));
-        sm->unlock();
+        lock.unlock();
         std::this_thread::sleep_for(std::chrono::microseconds(500));
     }
 }
 
-void writer_func(int id, std::mutex *sm, int* shared_data) {
+void writer_func(int id, ttb::SharedMutex *sm, int* shared_data) {
     for (int i = 0; i < 100; ++i) {
-        sm->lock();
+        std::unique_lock<ttb::SharedMutex> lock(*sm, std::defer_lock);
+        lock.lock();
         *shared_data += 1;
 //        printf("Writer %d\t, %d\n", id, *shared_data);
         std::this_thread::sleep_for(std::chrono::microseconds(1000));
-        sm->unlock();
+        lock.unlock();
         std::this_thread::sleep_for(std::chrono::microseconds(500));
     }
 }
@@ -42,7 +43,7 @@ void test_shared_mutex() {
     std::vector<std::thread> writers;
     writers.reserve(NUM_WRITERS);
 
-    std::mutex sm;
+    ttb::SharedMutex sm;
     int shared_data = 0;
 
     for (int i = 0; i < NUM_READERS; ++i) {
