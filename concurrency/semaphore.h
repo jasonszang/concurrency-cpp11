@@ -8,6 +8,7 @@
 #ifndef CONCURRENCY_SEMAPHORE_H_
 #define CONCURRENCY_SEMAPHORE_H_
 
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <map>
@@ -104,9 +105,8 @@ public:
         return try_acquire0(true, &timeout_time);
     }
 
-    int available_permits() {
-        std::lock_guard<LockType> lock(main_lock);
-        return permits;
+    int available_permits() const noexcept {
+        return permits.load();
     }
 
 private:
@@ -120,8 +120,8 @@ private:
     };
 
     /**
-     * Implementation of the thread waiting queue, a cached linked list of waiting nodes. This class
-     * is not thread safe and should be protected by the outer semaphore.
+     * Implementation of the thread waiting queue, a cached linked list of waiting nodes. This
+     * class is not thread safe and should be protected by the outer semaphore.
      */
     class WaitQueue {
     public:
@@ -337,7 +337,7 @@ private:
         }
     }
 
-    int permits = 0;
+    std::atomic_int permits = 0;
     LockType main_lock;
     WaitQueue queue;
     std::map<unsigned int, std::size_t> request_record;
@@ -426,9 +426,8 @@ public:
         return try_acquire0(true, timeout_time);
     }
 
-    int available_permits() {
-        std::lock_guard<LockType> lock(mtx);
-        return count;
+    int available_permits() const noexcept {
+        return count.load();
     }
 
 private:
@@ -449,7 +448,7 @@ private:
     typename std::conditional<std::is_same<LockType, std::mutex>::value,
           std::condition_variable,
           std::condition_variable_any>::type cv;
-    int32_t count;
+    std::atomic_int count;
 };
 
 /**
@@ -482,7 +481,9 @@ private:
 /**
  * A semaphore wrapper class that converts a semaphore (along with a fixed number of permit request)
  * to a TimedLockable class which can then be used with standard library components like
- * std::lock_guard and std::unique_lock.
+ * std::lock_guard and std::unique_lock, by forwarding lock, unlock, try_lock, try_lock_for and
+ * try_lock_until calls to semaphore acquire, release, try_acquire, try_acquire_for and
+ * try_acquire_until respectively.
  */
 template<class SemType>
 class SemaphoreLock {
