@@ -15,7 +15,7 @@ namespace ttb {
 
 namespace test {
 
-using SharedMutexType = ttb::SharedTimedMutex;
+using SharedMutexType = ttb::ReaderPreferringSharedTimedMutex;
 
 void reader_func(int id, SharedMutexType *sm, int* shared_data) {
     for (int i = 0; i < 100; ++i) {

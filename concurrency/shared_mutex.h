@@ -1,13 +1,10 @@
 /**
  * shared_mutex.h
- */
-#ifndef CONCURRENCY_SHARED_MUTEX_H_
-#define CONCURRENCY_SHARED_MUTEX_H_
-
-/**
  * Alternative implementations of shared mutex for C++11. Use C++14 std::shared_timed_mutex and
  * C++17 std::shared_mutex if available.
  */
+#ifndef CONCURRENCY_SHARED_MUTEX_H_
+#define CONCURRENCY_SHARED_MUTEX_H_
 
 namespace ttb {
 
@@ -142,6 +139,115 @@ private:
 
     // Combined state: The highest bit indicated weather a writer has entered (i.e. passed rgate),
     // lower 31 bits is number of active readers.
+    uint_fast32_t state = 0;
+};
+
+/**
+ * An alternative implementation of C++14 SharedTimedMutex concept.
+ * This implementation has higher read throughput when there are more readers but may
+ * starves writers.
+ * Use SharedTimedMutex instead if there is a chance that starvation is of concern.
+ */
+class ReaderPreferringSharedTimedMutex {
+public:
+    ReaderPreferringSharedTimedMutex() = default;
+
+    ReaderPreferringSharedTimedMutex(const ReaderPreferringSharedTimedMutex&) = delete;
+    ReaderPreferringSharedTimedMutex& operator=(const ReaderPreferringSharedTimedMutex&) = delete;
+
+    void lock() {
+        std::unique_lock<std::mutex> lock(mtx);
+        while(state) {
+            cv.wait(lock);
+        }
+        state = WRITER_ACTIVE_MASK;
+    }
+
+    void unlock() {
+        {
+            std::lock_guard<std::mutex> lock(mtx);
+            state = 0;
+        }
+        cv.notify_all();
+    }
+
+    bool try_lock() {
+        std::unique_lock<std::mutex> lock(mtx, std::try_to_lock);
+        if (lock.owns_lock() && state == 0) {
+            state = WRITER_ACTIVE_MASK;
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    template<class Rep, class Period>
+    bool try_lock_for(const std::chrono::duration<Rep, Period>& timeout_duration) {
+        return try_lock_until(std::chrono::steady_clock::now() + timeout_duration);
+    }
+
+    template<class Clock, class Duration>
+    bool try_lock_until(const std::chrono::time_point<Clock, Duration>& timeout_time) {
+        std::unique_lock<std::mutex> lock(mtx);
+        if (!cv.wait_until(lock, timeout_time, [this](){return state == 0;})) {
+            return false;
+        }
+        state = WRITER_ACTIVE_MASK;
+        return true;
+    }
+
+    void lock_shared() {
+        std::unique_lock<std::mutex> lock(mtx);
+        while((state & WRITER_ACTIVE_MASK) || ((state & NUM_READER_MASK) == NUM_READER_MASK)){
+            cv.wait(lock);
+        }
+        state += 1;
+    }
+
+    void unlock_shared() {
+        std::unique_lock<std::mutex> lock(mtx);
+        state -= 1;
+        if (state == 0) {
+            lock.unlock();
+            cv.notify_all();
+        }
+    }
+
+    bool try_lock_shared() {
+        std::unique_lock<std::mutex> lock(mtx, std::try_to_lock);
+        if (lock.owns_lock()
+                && !(state & WRITER_ACTIVE_MASK) &&
+                        ((state & NUM_READER_MASK) != NUM_READER_MASK)) {
+            state += 1;
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    template<class Rep, class Period>
+    bool try_lock_shared_for(const std::chrono::duration<Rep, Period>& timeout_duration) {
+        return try_lock_shared_until(std::chrono::steady_clock::now() + timeout_duration);
+    }
+
+    template<class Clock, class Duration>
+    bool try_lock_shared_until(const std::chrono::time_point<Clock, Duration>& timeout_time) {
+        std::unique_lock<std::mutex> lock(mtx);
+        if (!cv.wait_until(lock, timeout_time,
+                [this](){return !(state & WRITER_ACTIVE_MASK) &&
+                        ((state & NUM_READER_MASK) != NUM_READER_MASK);})) {
+            return false;
+        }
+        state += 1;
+        return true;
+    }
+
+private:
+    static const uint_fast32_t WRITER_ACTIVE_MASK = 1U << 31;
+    static const uint_fast32_t NUM_READER_MASK = WRITER_ACTIVE_MASK - 1;
+
+    std::mutex mtx;
+    std::condition_variable cv;
     uint_fast32_t state = 0;
 };
 
