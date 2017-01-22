@@ -45,6 +45,7 @@ public:
     bool try_lock() {
         std::unique_lock<std::mutex> lock(mtx, std::try_to_lock);
         if (lock.owns_lock() && state == 0) {
+            state = WRITER_ENTERED_MASK;
             return true;
         } else {
             return false;
