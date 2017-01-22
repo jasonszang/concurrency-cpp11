@@ -479,25 +479,27 @@ private:
 };
 
 /**
- * A semaphore wrapper class that converts a semaphore (along with a fixed number of permit request)
+ * A semaphore adapter class that converts a semaphore (along with a fixed number of permit request)
  * to a TimedLockable class which can then be used with standard library components like
  * std::lock_guard and std::unique_lock, by forwarding lock, unlock, try_lock, try_lock_for and
  * try_lock_until calls to semaphore acquire, release, try_acquire, try_acquire_for and
  * try_acquire_until respectively.
+ * This adapter class does not perform any RAII-style resource managing. Rather it allows RAII
+ * managing of semaphores with existing standard library components.
  */
 template<class SemType>
-class SemaphoreLock {
+class SemaphoreTimedLockableAdapter {
 public:
     using SemaphoreType = SemType;
 
-    explicit SemaphoreLock(SemType& semaphore, unsigned int request) :
+    explicit SemaphoreTimedLockableAdapter(SemType& semaphore, unsigned int request) :
             sem(semaphore), request(request) {
     }
 
-    SemaphoreLock(const SemaphoreLock&) = delete;
-    SemaphoreLock& operator=(const SemaphoreLock&) = delete;
+    SemaphoreTimedLockableAdapter(const SemaphoreTimedLockableAdapter&) = delete;
+    SemaphoreTimedLockableAdapter& operator=(const SemaphoreTimedLockableAdapter&) = delete;
 
-    ~SemaphoreLock() {
+    ~SemaphoreTimedLockableAdapter() {
     }
 
     void lock() {

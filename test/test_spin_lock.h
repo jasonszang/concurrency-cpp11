@@ -27,7 +27,7 @@ ttb::PThreadSpinLockWrapper psw;
 ttb::FairSpinLock fsl;
 
 ttb::SimpleSemaphore<std::mutex> sem(1);
-ttb::SemaphoreLock<decltype(sem)> sem_lock(sem, 1);
+ttb::SemaphoreTimedLockableAdapter<decltype(sem)> sem_lock(sem, 1);
 std::mutex m;
 
 inline void thread_function(int num) {
