@@ -12,15 +12,15 @@
 namespace ttb {
 
 /**
- * An implementation of shared mutex that satisfies C++14 SharedMutex concept and does not starve
- * readers or writers.
+ * An implementation of shared timed mutex that satisfies C++14 SharedTimedMutex concept and does
+ * not starve readers or writers.
  */
-class SharedMutex {
+class SharedTimedMutex {
 public:
-    SharedMutex() = default;
+    SharedTimedMutex() = default;
 
-    SharedMutex(const SharedMutex&) = delete;
-    SharedMutex& operator=(const SharedMutex&) = delete;
+    SharedTimedMutex(const SharedTimedMutex&) = delete;
+    SharedTimedMutex& operator=(const SharedTimedMutex&) = delete;
 
     // Execlusive lock
     void lock() {
@@ -49,6 +49,30 @@ public:
         } else {
             return false;
         }
+    }
+
+    template<class Rep, class Period>
+    bool try_lock_for(const std::chrono::duration<Rep, Period>& timeout_duration) {
+        return try_lock_until(std::chrono::steady_clock::now() + timeout_duration);
+    }
+
+    template<class Clock, class Duration>
+    bool try_lock_until(const std::chrono::time_point<Clock, Duration>& timeout_time) {
+        // Untimed mutex blocking, but mutex normally should not take long to acquire
+        std::unique_lock<std::mutex> lock(mtx);
+        if (!rgate.wait_until(lock, timeout_time,
+                [this](){return !(state & WRITER_ENTERED_MASK);})) {
+            return false;
+        }
+        state |= WRITER_ENTERED_MASK;
+        if (!wgate.wait_until(lock, timeout_time,
+                [this](){return !(state & NUM_READER_MASK);})) {
+            state &= ~WRITER_ENTERED_MASK;
+            lock.unlock();
+            rgate.notify_all();
+            return false;
+        }
+        return true;
     }
 
     void lock_shared() {
@@ -81,6 +105,23 @@ public:
         } else {
             return false;
         }
+    }
+
+    template<class Rep, class Period>
+    bool try_lock_shared_for(const std::chrono::duration<Rep, Period>& timeout_duration) {
+        return try_lock_shared_until(std::chrono::steady_clock::now() + timeout_duration);
+    }
+
+    template<class Clock, class Duration>
+    bool try_lock_shared_until(const std::chrono::time_point<Clock, Duration>& timeout_time) {
+        std::unique_lock<std::mutex> lock(mtx);
+        if (!rgate.wait_until(lock, timeout_time,
+                [this](){return !(state & WRITER_ENTERED_MASK) &&
+                        ((state & NUM_READER_MASK) != NUM_READER_MASK);})) {
+            return false;
+        }
+        state += 1;
+        return true;
     }
 
 private:
@@ -215,7 +256,6 @@ private:
     bool owns;
 };
 
-}
- // namespace ttb
+} // namespace ttb
 
 #endif /* CONCURRENCY_SHARED_MUTEX_H_ */
