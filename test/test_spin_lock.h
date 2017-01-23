@@ -33,9 +33,9 @@ std::mutex m;
 inline void thread_function(int num) {
     for (int i = 0; i < num; ++i) {
 //        std::lock_guard<ttb::SpinLock> l(sl);
-//        std::lock_guard<ttb::PThreadSpinLockWrapper> l(psw);
+        std::lock_guard<ttb::PThreadSpinLockWrapper> l(psw);
 //        std::lock_guard<ttb::FairSpinLock> l(fsl);
-        std::lock_guard<decltype(sem_lock)> l(sem_lock);
+//        std::lock_guard<decltype(sem_lock)> l(sem_lock);
 //        std::lock_guard<std::mutex> l(m);
         g -= 1;
         volatile int j = 500;

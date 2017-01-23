@@ -8,7 +8,10 @@
 #ifndef PTHREAD_WRAPPER_PTHREAD_SPINLOCK_H_
 #define PTHREAD_WRAPPER_PTHREAD_SPINLOCK_H_
 
+#include <cassert>
+#include <errno.h>
 #include <pthread.h>
+#include <system_error>
 
 namespace ttb {
 
@@ -17,32 +20,57 @@ namespace ttb {
  */
 class PThreadSpinLockWrapper {
 public:
-    PThreadSpinLockWrapper() noexcept: l(new pthread_spinlock_t()) {
-        pthread_spin_init(l, PTHREAD_PROCESS_PRIVATE);
+    PThreadSpinLockWrapper() {
+        int ret = pthread_spin_init(&l, PTHREAD_PROCESS_PRIVATE);
+        if (ret == ENOMEM) {
+            throw(std::bad_alloc());
+        } else if (ret == EAGAIN) {
+            throw(std::system_error(
+                    std::make_error_code(std::errc::resource_unavailable_try_again)));
+        }
+        // Errors not handled: EBUSY, EINVAL
+        assert(ret == 0);
     }
 
     ~PThreadSpinLockWrapper() {
-        pthread_spin_destroy(l);
-        delete l;
+        int ret = pthread_spin_destroy(&l);
+        (void) ret;
+        // Errors not handled: EBUSY, EINVAL
+        assert(ret == 0);
     }
 
     PThreadSpinLockWrapper(const PThreadSpinLockWrapper &rhs) = delete;
     PThreadSpinLockWrapper &operator=(const PThreadSpinLockWrapper &rhs) = delete;
 
     void lock() {
-        pthread_spin_lock(l); // undefined if caller has the lock
+        int ret = pthread_spin_lock(&l); // undefined if caller has the lock
+        if (ret == EDEADLK) {
+            throw(std::system_error(
+                    std::make_error_code(std::errc::resource_deadlock_would_occur)));
+        }
+        // Errors not handled: EINVAL
+        assert(ret == 0);
     }
 
     void unlock() {
-        pthread_spin_unlock(l);
+        int ret = pthread_spin_unlock(&l);
+        (void) ret;
+        // Errors not handled: EINVAL, EPERM
+        assert(ret == 0);
     }
 
     bool try_lock() {
-        return pthread_spin_trylock(l) == 0;
+        int ret = pthread_spin_trylock(&l);
+        if (ret == EDEADLK || ret == EBUSY) {
+            return false;
+        }
+        // Errors not handled: EINVAL
+        assert(ret == 0);
+        return true;
     }
 
 private:
-    pthread_spinlock_t * const l;
+    pthread_spinlock_t l;
 };
 
 }

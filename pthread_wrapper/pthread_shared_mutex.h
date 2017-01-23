@@ -18,12 +18,10 @@ public:
         int ret = pthread_rwlock_init(&rwlock_handle, NULL);
         if (ret == ENOMEM) {
             throw(std::bad_alloc());
-        }
-        else if (ret == EAGAIN) {
+        } else if (ret == EAGAIN) {
             throw(std::system_error(
                     std::make_error_code(std::errc::resource_unavailable_try_again)));
-        }
-        else if (ret == EPERM) {
+        } else if (ret == EPERM) {
             throw(std::system_error(
                     std::make_error_code(std::errc::operation_not_permitted)));
         }
