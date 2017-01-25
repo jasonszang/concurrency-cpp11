@@ -6,7 +6,7 @@
 
 #include "scope_guard.h"
 
-namespace ttb {
+namespace conc11 {
 
 // "Reimplement" C++17 std::invoke
 // DO NOT format this code with code formatters. They are just too stupid to format it correctly.
@@ -94,7 +94,7 @@ auto invoke(F&& f, ArgTypes&&... args)
     return detail::_invoke(std::forward<F>(f), std::forward<ArgTypes>(args)...);
 }
 
-// Some extra gadgets based on ttb::invoke()
+// Some extra gadgets based on conc11::invoke()
 
 namespace detail {
 template<class Rep, class Period>
@@ -134,6 +134,6 @@ auto timed_invoke(std::chrono::duration<Rep, Period> *time_elapsed, Callable c, 
     return invoke(std::forward<Callable>(c), std::forward<Args>(args)...);
 }
 
-} // namespace ttb
+} // namespace conc11
 
 #endif /* UTIL_BITS_INVOKE_H_ */

@@ -16,7 +16,7 @@
 #include <mutex>
 #include <type_traits>
 
-namespace ttb {
+namespace conc11 {
 
 template<class LockType>
 class QueuedSemaphore {
@@ -529,6 +529,6 @@ private:
     const unsigned int request;
 };
 
-} // namespace ttb
+} // namespace conc11
 
 #endif /* CONCURRENCY_SEMAPHORE_H_ */

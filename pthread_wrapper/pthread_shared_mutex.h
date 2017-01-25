@@ -10,7 +10,7 @@
 #include <pthread.h>
 #include <system_error>
 
-namespace ttb {
+namespace conc11 {
 
 class PThreadSharedMutex {
 public:
@@ -100,6 +100,6 @@ private:
     pthread_rwlock_t rwlock_handle;
 };
 
-} // namespace ttb
+} // namespace conc11
 
 #endif /* PTHREAD_WRAPPER_PTHREAD_SHARED_MUTEX_H_ */

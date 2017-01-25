@@ -13,7 +13,7 @@
 #include <type_traits>
 #endif
 
-namespace ttb {
+namespace conc11 {
 
 /**
  * A C++ wrapper utility for pthread_specific-based thread local storage that will make your life
@@ -115,6 +115,6 @@ private:
 #endif
 };
 
-} // namespace ttb
+} // namespace conc11
 
 #endif /* PTHREAD_WRAPPER_PTHREAD_LOCAL_PTR_H_ */

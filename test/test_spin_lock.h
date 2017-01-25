@@ -17,24 +17,24 @@
 #include "../pthread_wrapper/pthread_spinlock.h"
 #include "../concurrency/semaphore.h"
 
-namespace ttb {
+namespace conc11 {
 
 namespace test {
 
 static int g = 100000;
-ttb::SpinLock sl;
-ttb::PThreadSpinLockWrapper psw;
-ttb::FairSpinLock fsl;
+conc11::SpinLock sl;
+conc11::PThreadSpinLockWrapper psw;
+conc11::FairSpinLock fsl;
 
-ttb::SimpleSemaphore<std::mutex> sem(1);
-ttb::SemaphoreTimedLockableAdapter<decltype(sem)> sem_lock(sem, 1);
+conc11::SimpleSemaphore<std::mutex> sem(1);
+conc11::SemaphoreTimedLockableAdapter<decltype(sem)> sem_lock(sem, 1);
 std::mutex m;
 
 inline void thread_function(int num) {
     for (int i = 0; i < num; ++i) {
-//        std::lock_guard<ttb::SpinLock> l(sl);
-        std::lock_guard<ttb::PThreadSpinLockWrapper> l(psw);
-//        std::lock_guard<ttb::FairSpinLock> l(fsl);
+//        std::lock_guard<conc11::SpinLock> l(sl);
+        std::lock_guard<conc11::PThreadSpinLockWrapper> l(psw);
+//        std::lock_guard<conc11::FairSpinLock> l(fsl);
 //        std::lock_guard<decltype(sem_lock)> l(sem_lock);
 //        std::lock_guard<std::mutex> l(m);
         g -= 1;
@@ -58,6 +58,6 @@ inline void test_spin_lock() {
 
 } // namespace test
 
-} // namespace ttb
+} // namespace conc11
 
 #endif /* TEST_TEST_SPIN_LOCK_H_ */

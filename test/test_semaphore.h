@@ -14,7 +14,7 @@
 #include "../concurrency/semaphore.h"
 #include "../concurrency/spin_lock.h"
 
-namespace ttb {
+namespace conc11 {
 
 namespace test {
 
@@ -63,5 +63,5 @@ void test_semaphore() {
 
 } // namespace test
 
-} // namespace ttb
+} // namespace conc11
 #endif /* TEST_SEMAPHORE_H_ */

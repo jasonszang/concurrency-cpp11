@@ -6,7 +6,7 @@
 
 #include <cassert>
 
-namespace ttb {
+namespace conc11 {
 
 namespace detail {
 
@@ -89,6 +89,6 @@ detail::ScopeGuardImpl<Pre, Post> make_scope_guard(Pre&& pre, Post&& post) {
     return detail::ScopeGuardImpl<Pre, Post>(std::forward<Pre>(pre), std::forward<Post>(post));
 }
 
-} // namespace ttb
+} // namespace conc11
 
 #endif /* UTIL_BITS_SCOPE_GUARD_H_ */

@@ -11,7 +11,7 @@
 
 #include "../concurrency/semaphore.h"
 
-namespace ttb {
+namespace conc11 {
 
 namespace test {
 
@@ -19,7 +19,7 @@ template <class Semaphore>
 void thread_func_b(Semaphore *sem, int id) {
     for (int i = 0; i < 100; ++i) {
 //        printf("Acquiring\n");
-        SemaphoreGuard<ttb::QueuedSemaphore<std::mutex>> sg(*sem, i % 20);
+        SemaphoreGuard<conc11::QueuedSemaphore<std::mutex>> sg(*sem, i % 20);
 //        printf("Thread id: %d, Permits = %d, Waiting nodes = %d\n", id, bqs->permits, bqs->num_waiting_nodes());
         std::this_thread::sleep_for(std::chrono::milliseconds(3));
 //        printf("Releasing\n");
@@ -40,7 +40,7 @@ void thread_func_nb(Semaphore *sem, int id) {
 }
 
 void test_queued_semaphore() {
-    using SemaphoreType = ttb::QueuedSemaphore<std::mutex>;
+    using SemaphoreType = conc11::QueuedSemaphore<std::mutex>;
     static const int NUM_THREADS = 512;
     SemaphoreType sem(64);
     std::vector<std::thread> blocking_threads;
@@ -62,6 +62,6 @@ void test_queued_semaphore() {
 
 } // namespace test
 
-} // namespace ttb
+} // namespace conc11
 
 #endif /* TEST_TEST_QUEUED_SEMAPHORE_H_ */

@@ -11,16 +11,16 @@
 #include "../concurrency/shared_mutex.h"
 #include "../pthread_wrapper/pthread_shared_mutex.h"
 
-namespace ttb {
+namespace conc11 {
 
 namespace test {
 
-using SharedMutexType = ttb::ReaderPreferringSharedTimedMutex;
+using SharedMutexType = conc11::ReaderPreferringSharedTimedMutex;
 
 void reader_func(int id, SharedMutexType *sm, int* shared_data) {
     for (int i = 0; i < 100; ++i) {
-        ttb::SharedLock<SharedMutexType> lock(*sm);
-//        ttb::SharedLock<ttb::SharedTimedMutex> lock(*sm, std::defer_lock);
+        conc11::SharedLock<SharedMutexType> lock(*sm);
+//        conc11::SharedLock<conc11::SharedTimedMutex> lock(*sm, std::defer_lock);
 //        while (!lock.try_lock_for(std::chrono::microseconds(1000))) {
 //            printf("Reader %d\ttimeout\n", id);
 //        }
@@ -34,7 +34,7 @@ void reader_func(int id, SharedMutexType *sm, int* shared_data) {
 void writer_func(int id, SharedMutexType *sm, int* shared_data) {
     for (int i = 0; i < 100; ++i) {
         std::unique_lock<SharedMutexType> lock(*sm);
-//        std::unique_lock<ttb::SharedTimedMutex> lock(*sm, std::defer_lock);
+//        std::unique_lock<conc11::SharedTimedMutex> lock(*sm, std::defer_lock);
 //        while (!lock.try_lock_for(std::chrono::microseconds(1000))) {
 //            printf("Writer %d\ttimeout\n", id);
 //        }
@@ -48,7 +48,7 @@ void writer_func(int id, SharedMutexType *sm, int* shared_data) {
 
 void reader_func_cont(int id, SharedMutexType* sm, std::map<int, std::string>* shared_map) {
     for (int i = 0; i < 100; ++i) {
-        ttb::SharedLock<SharedMutexType> lock(*sm, std::defer_lock);
+        conc11::SharedLock<SharedMutexType> lock(*sm, std::defer_lock);
 
 //        lock.lock();
 
@@ -133,6 +133,6 @@ void test_shared_mutex_cont() {
 
 } // namespace test
 
-} // namespace ttb
+} // namespace conc11
 
 #endif /* TEST_TEST_SHARED_MUTEX_H_ */

@@ -13,7 +13,7 @@
 #include <pthread.h>
 #include <system_error>
 
-namespace ttb {
+namespace conc11 {
 
 /**
  * @brief A thin-layer wrapper for pthread_spin, satisfies Lockable.
@@ -74,6 +74,6 @@ private:
 };
 
 }
- // namespace ttb
+ // namespace conc11
 
 #endif /* PTHREAD_WRAPPER_PTHREAD_SPINLOCK_H_ */

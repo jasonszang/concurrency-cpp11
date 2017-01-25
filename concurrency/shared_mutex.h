@@ -6,7 +6,7 @@
 #ifndef CONCURRENCY_SHARED_MUTEX_H_
 #define CONCURRENCY_SHARED_MUTEX_H_
 
-namespace ttb {
+namespace conc11 {
 
 /**
  * An implementation of shared timed mutex that satisfies C++14 SharedTimedMutex concept and does
@@ -363,6 +363,6 @@ private:
     bool owns;
 };
 
-} // namespace ttb
+} // namespace conc11
 
 #endif /* CONCURRENCY_SHARED_MUTEX_H_ */

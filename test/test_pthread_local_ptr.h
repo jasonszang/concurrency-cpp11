@@ -12,7 +12,7 @@
 
 #include "../pthread_wrapper/pthread_local_ptr.h"
 
-namespace ttb {
+namespace conc11 {
 
 namespace test {
 
@@ -107,4 +107,4 @@ void test_pthread_specific() {
 }
  // namespace test
 
-}// namespace ttb
+}// namespace conc11

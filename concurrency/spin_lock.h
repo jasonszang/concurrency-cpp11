@@ -12,7 +12,7 @@
 #include <cstdio>
 #include <pthread.h>
 
-namespace ttb {
+namespace conc11 {
 
 static const uint_fast16_t SPIN_CYCLES_BEFORE_YIELD = 100;
 static const uint_fast16_t SPIN_CYCLES_BEFORE_YIELD_FAIR = 100;
@@ -85,6 +85,6 @@ private:
     std::atomic_uint active;
 };
 
-} // namespace ttb
+} // namespace conc11
 
 #endif /* CONCURRENCY_SPINLOCK_H_ */

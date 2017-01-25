@@ -4,7 +4,7 @@
 #ifndef UTIL_BITS_RVALUE_WRAPPER_H_
 #define UTIL_BITS_RVALUE_WRAPPER_H_
 
-namespace ttb {
+namespace conc11 {
 
 /**
  * A wrapper for holding and passing rvalues through std::bind. The rvalue wrapped will be stored
@@ -42,11 +42,11 @@ RValueWrapper<T> rval(T &t) {
     return RValueWrapper<T>(T(t));
 }
 
-} // namespace ttb
+} // namespace conc11
 
 namespace std {
 template<typename T>
-struct is_bind_expression<ttb::RValueWrapper<T>> : std::true_type {
+struct is_bind_expression<conc11::RValueWrapper<T>> : std::true_type {
 };
 }
 
