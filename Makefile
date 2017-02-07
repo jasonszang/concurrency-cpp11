@@ -18,7 +18,7 @@ all:	$(TARGET)
 $(OBJS): $(HEADERS)
 
 $(TARGET):	$(OBJS) $(HEADERS)
-	$(CXX) --std=c++11 -o $(TARGET) $(OBJS) $(LDFLAGS) $(LIBS)
+	$(CXX) $(CXXFLAGS) -o $(TARGET) $(OBJS) $(LDFLAGS) $(LIBS)
 
 .PHONY: run
 run:    $(TARGET)
