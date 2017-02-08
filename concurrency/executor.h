@@ -7,10 +7,8 @@
 #include <chrono>
 #include <functional>
 #include <future>
-#include <list>
 #include <queue>
 #include "../util/util.h"
-#include "spin_lock.h"
 
 namespace conc11 {
 
@@ -32,7 +30,7 @@ protected:
     template<class RetType>
     class Task : public TaskBase {
     public:
-        Task(std::packaged_task<RetType()>&& task) noexcept :task(std::move(task)) {
+        explicit Task(std::packaged_task<RetType()>&& task) noexcept :task(std::move(task)) {
         }
 
         virtual void operator()() override {
@@ -40,6 +38,25 @@ protected:
         }
     private:
         std::packaged_task<RetType()> task;
+    };
+
+    template<class Runnable>
+    class UntrackableTask : public TaskBase {
+    public:
+        explicit UntrackableTask(Runnable&& r) noexcept:r(std::forward<Runnable>(r)) {
+        }
+
+        virtual void operator()() override {
+            try {
+                r();
+            } catch (...) {
+                // Swallows exceptions from RunnableTask as there are no means to retrive neither
+                // results nor exceptions
+            }
+        }
+
+    private:
+        typename std::remove_reference<Runnable>::type r;
     };
 
     ExecutorBase() = default;
@@ -72,28 +89,51 @@ public:
         reap_dead_workers_locked();
     }
 
+    /**
+     * Submits a callable and its parameters to be executed at some time in the future.
+     * The callable object and parameters will be stored using std::bind. The retsult and possible
+     * exceptions may be retrived with the returned std::future object.
+     */
     template<typename Callable, typename ... Args>
-    auto submit(Callable &&c, Args &&...args)
+    auto submit(Callable&& c, Args&&... args)
     -> std::future<decltype(invoke(std::forward<Callable>(c), std::forward<Args>(args)...))> {
+        using RetType = decltype(
+                invoke(std::forward<Callable>(c), std::forward<Args>(args)...));
+
         if (shut.load()) {
             throw(std::system_error(std::make_error_code(std::errc::permission_denied)));
         }
-        using RetType = decltype(
-                invoke(std::forward<Callable>(c), std::forward<Args>(args)...));
-        std::packaged_task<RetType()> task(std::bind(std::forward<Callable>(c),
-                std::forward<Args>(args)...));
+        std::packaged_task<RetType()> task(
+                std::bind(std::forward<Callable>(c), std::forward<Args>(args)...));
         std::future<RetType> f = task.get_future();
         auto uptr_task = conc11::make_unique<Task<RetType>>(std::move(task));
         {
             std::lock_guard<std::mutex> lock(main_lock);
-            task_queue.emplace(std::move(uptr_task));
-            size_t idle_workers = workers.size() - active_count.load();
-            if (idle_workers == 0 && workers.size() < max_pool_size) {
-                add_worker_locked(false);
-            }
-            cv.notify_one();
+            insert_task_locked(std::move(uptr_task));
         }
         return f;
+    }
+
+    /**
+     * Submits a callable and its parameters to be executed at some time in the future. Unlike
+     * submit(), result cannot be retrived as no std::future will be returned. If an exception
+     * occured during execution, the execution will be interrupted and the exception will be
+     * lost.
+     * For executing tasks that requires no tracking var std::future this alternative method of
+     * submitting tasks yields considerably higher performance on some platforms including Linux.
+     */
+    template<typename Callable, typename ... Args>
+    void execute(Callable&& c, Args&&... args) {
+        if (shut.load()) {
+            throw(std::system_error(std::make_error_code(std::errc::permission_denied)));
+        }
+        auto bind_obj = std::bind(std::forward<Callable>(c), std::forward<Args>(args)...);
+        auto uptr_task = conc11::make_unique<UntrackableTask<decltype(bind_obj)>>(
+                std::move(bind_obj));
+        {
+            std::lock_guard<std::mutex> lock(main_lock);
+            insert_task_locked(std::move(uptr_task));
+        }
     }
 
     // FIXME: core thread must not be 0 or handle special case when thread pool has no live thread
@@ -164,7 +204,7 @@ public:
         return is_terminated_locked();
     }
 
-public:
+private:
 
     /**
      * Thread worker that manages a worker thread and will remove self from the workers array
@@ -289,6 +329,15 @@ public:
         int id;
         std::thread worker_thread;
     };
+
+    void insert_task_locked(std::unique_ptr<TaskBase>&& task) {
+        task_queue.emplace(std::move(task));
+        size_t idle_workers = workers.size() - active_count.load();
+        if (idle_workers == 0 && workers.size() < max_pool_size) {
+            add_worker_locked(false);
+        }
+        cv.notify_one();
+    }
 
     void add_worker_locked(bool core) {
         static int id = 1;
