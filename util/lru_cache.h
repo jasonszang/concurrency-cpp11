@@ -1,26 +1,27 @@
 /*
- * in_memory_lru.h
+ * lru_cache.h
  */
-#ifndef UTIL_IN_MEMORY_LRU_H_
-#define UTIL_IN_MEMORY_LRU_H_
+#ifndef UTIL_LRU_CACHE_H_
+#define UTIL_LRU_CACHE_H_
 
 #include <cassert>
 #include <string>
 #include <unordered_map>
+
+namespace conc11 {
 
 /**
  * An in memory LRU caching container for storing key-value pairs. Value type is required to be
  * Assignable.
  */
 template<class TK, class TV, class Hash = std::hash<TK>, class Eql = std::equal_to<TK>>
-class InMemoryLru {
+class LRUCache {
 public:
-
-    InMemoryLru(size_t capacity) :
+    LRUCache(size_t capacity) :
             mem(), capacity(capacity), lru_list_head(nullptr), lru_list_tail(nullptr) {
     }
 
-    ~InMemoryLru() {
+    ~LRUCache() {
     }
 
     /**
@@ -50,6 +51,8 @@ public:
      * Returns pointer to the stored value, or nullptr if key not found.
      * The returned pointer may become invalidated after a set, erase or clear operation and
      * should not be stored.
+     * If accessed from multiple threads, returned pointers should no longer be used after leaving
+     * the critical region.
      */
     TV* get(const TK& key) {
         auto iter = mem.find(key);
@@ -106,6 +109,13 @@ public:
         list_move_to_head(&(*iter));
         *out_value_pointee = *(iter->second.value);
         return true;
+    }
+
+    /**
+     * Return if the key exists. Does not count as a "usage" and will not affect LRU.
+     */
+    bool has_key(const TK& key) {
+        return (mem.find(key) != mem.end());
     }
 
     /**
@@ -206,4 +216,66 @@ private:
     PairType* lru_list_tail;
 };
 
-#endif /* UTIL_IN_MEMORY_LRU_H_ */
+/**
+ * A thread-safe blocking version of in-memory LRU cache.
+ * BlockingInMemoryLru does not provide get() method that returns pointers to stored objects as
+ * the pointers should not be used after leaving the critical region.
+ */
+template<class TK, class TV, class Hash = std::hash<TK>, class Eql = std::equal_to<TK>,
+        class Mutex = std::mutex>
+class BlockingLRUCache {
+public:
+    BlockingLRUCache(size_t capacity):unsynced_cache(capacity){
+    }
+
+    BlockingLRUCache(const BlockingLRUCache&) = delete;
+    BlockingLRUCache& operator=(const BlockingLRUCache&) = delete;
+
+    ~BlockingLRUCache() {
+    }
+
+    template<class UK, class UV,
+            class = typename std::enable_if<std::is_convertible<UK, TK>::value>::type,
+            class = typename std::enable_if<std::is_convertible<UV, TV>::value>::type>
+    void set(UK&& key, UV&& value) {
+        std::lock_guard<Mutex> lock(mtx);
+        unsynced_cache.set(std::forward<UK>(key), std::forward<UV>(value));
+    }
+
+    bool get_copy(const TK& key, TV* out_value) {
+        std::lock_guard<Mutex> lock(mtx);
+        return unsynced_cache.get_copy(key, out_value);
+    }
+
+    bool get_move(const TK& key, TV* out_value) {
+        std::lock_guard<Mutex> lock(mtx);
+        return unsynced_cache.get_move(key, out_value);
+    }
+
+    template<class TV_ = TV>
+    bool get_copy_pointee(const TK& key,
+                          typename std::remove_reference<
+                                  decltype(*(std::declval<TV_>()))
+                          >::type* out_value_pointee) {
+        std::lock_guard<Mutex> lock(mtx);
+        return unsynced_cache.get_copy_pointee(key, out_value_pointee);
+    }
+
+    bool erase(const TK& key) {
+        std::lock_guard<Mutex> lock(mtx);
+        return unsynced_cache.erase(key);
+    }
+
+    void clear() {
+        std::lock_guard<Mutex> lock(mtx);
+        unsynced_cache.clear();
+    }
+
+private:
+    LRUCache<TK, TV, Hash, Eql> unsynced_cache;
+    Mutex mtx;
+};
+
+} // namespace conc11
+
+#endif /* UTIL_LRU_CACHE_H_ */
