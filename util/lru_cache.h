@@ -5,6 +5,7 @@
 #define UTIL_LRU_CACHE_H_
 
 #include <cassert>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 
