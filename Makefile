@@ -1,5 +1,5 @@
 CPPFLAGS =  -D_GNU_SOURCE
-CXXFLAGS =  -g -O2 -Wall -fmessage-length=0 --std=c++11
+CXXFLAGS =  -g -O2 -Wall -Wno-format -fmessage-length=0 --std=c++11
 LDFLAGS  =  -lpthread
 
 HEADERS =   $(wildcard test/*.h)

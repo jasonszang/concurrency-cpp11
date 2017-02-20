@@ -64,9 +64,9 @@ protected:
     ExecutorBase& operator=(const ExecutorBase&) = delete;
 };
 
-class Executor : public ExecutorBase{
+class ThreadPoolExecutor : public ExecutorBase{
 public:
-    Executor(size_t core_pool_size,
+    ThreadPoolExecutor(size_t core_pool_size,
              size_t max_pool_size,
              std::chrono::nanoseconds::rep timeout_nanoseconds) :
             core_pool_size(core_pool_size), max_pool_size(max_pool_size),
@@ -80,7 +80,7 @@ public:
         dead_workers.reserve(max_threads);
     }
 
-    ~Executor() {
+    ~ThreadPoolExecutor() {
         if (!is_terminated()) {
             shutdown();
             await_termination();
@@ -136,14 +136,10 @@ public:
         }
     }
 
-    // FIXME: core thread must not be 0 or handle special case when thread pool has no live thread
-    // i.e. all cached threads timed out
     void shutdown() noexcept {
-//        printf("shutdown called\n");
         std::lock_guard<std::mutex> lock(main_lock);
         shut.store(true);
         if (is_terminated_locked()) {
-//            printf("pool already empty, notifying waiters\n");
             wait_cv.notify_all();
         } else {
             cv.notify_all();
@@ -151,21 +147,15 @@ public:
     }
 
     void await_termination() {
-//        printf("await_termination called\n");
         if (is_terminated()) {
-//            printf("await_termination first check\n");
             return;
         }
         std::unique_lock<std::mutex> lock(main_lock);
-//        printf("await_termination acquired lock\n");
-        if (is_terminated_locked()) { // double check in case last thread my exit between the first check
-                               // and now resulting in deadlock
-//            printf("await_termination second check\n");
+        if (is_terminated_locked()) { // double check in case last thread my exit between the
+                                      // first check and now resulting in deadlock
             return;
         }
-//        printf("await_termination waiting\n");
         wait_cv.wait(lock, [this](){return is_terminated_locked();});
-//        printf("await_termination done waiting\n");
     }
 
     template<class Rep, class Period>
@@ -180,9 +170,15 @@ public:
             return true;
         }
         std::unique_lock<std::mutex> lock(main_lock);
+        if (is_terminated_locked()) {
+            return true;
+        }
         return wait_cv.wait_until(lock, timeout_time, [this](){return is_terminated();});
     }
 
+    /**
+     * Return number of living threads in the thread pool.
+     */
     size_t get_pool_size() noexcept {
         std::lock_guard<std::mutex> lock(main_lock);
         return workers.size();
@@ -214,10 +210,9 @@ private:
      */
     class Worker {
     public:
-        Worker(Executor& executor, bool core, size_t worker_index, int id) noexcept:
+        Worker(ThreadPoolExecutor& executor, bool core, size_t worker_index, int id) noexcept:
         exec(executor), core(core), worker_index(worker_index),
         id(id), worker_thread(std::ref(*this)) {
-//            printf("Worker %d created, index %lu\n", id, worker_index);
         }
         Worker(const Worker&) = delete;
         Worker& operator=(const Worker&) = delete;
@@ -275,7 +270,6 @@ private:
          * Assumes the thread associated with this Worker instance owns the main lock.
          */
         void remove_self_locked() {
-//            printf("Worker %d dead, index before removal: %lu\n", id, worker_index);
             std::swap(exec.workers[worker_index], exec.workers.back());
             exec.workers[worker_index]->worker_index = worker_index;
             exec.dead_workers.emplace_back(std::move(exec.workers.back()));
@@ -289,12 +283,10 @@ private:
                 if (exec.shut.load() && exec.task_queue.empty()) {
                     break;
                 }
-//                printf("Worker %d waiting for job\n", id);
                 std::unique_ptr<TaskBase> task = fetch_task_locked(lock);
                 if (!task) {
                     break;
                 }
-//                printf("Worker %d executing job\n", id);
                 ++exec.active_count;
                 lock.unlock();
                 (*task)();
@@ -302,25 +294,20 @@ private:
                 lock.lock();
                 exec.reap_dead_workers_locked();
                 --exec.active_count;
-
-//                printf("Worker %d done job\n", id);
             }
             {
                 // handle thread exit
                 std::lock_guard<std::mutex> lock(exec.main_lock);
                 remove_self_locked();
-//                printf("Worker %d exited, shut: %d, tq size: %lu, workers: %lu\n",
-//                       id, exec.shut.load(), exec.task_queue.size(), exec.workers.size());
                 if (exec.is_terminated_locked()) {
-//                    printf("Last thread exit, notifying waiters\n");
                     // Last worker exit after shutdown, finalize executor and notify all waiters
                     exec.wait_cv.notify_all();
                 }
             }
         }
 
-        // Worker collection object
-        Executor& exec;
+        // The executor this worker belongs to
+        ThreadPoolExecutor& exec;
         // Is core thread or not. Core threads do not exit after a timeout period.
         bool core = false;
         // Index of this worker instance in the worker list.
@@ -354,7 +341,6 @@ private:
         }
         for (const auto &worker : dead_workers) {
             worker->join();
-//            printf("Worker %d reaped\n", worker->get_id());
         }
         dead_workers.clear();
     }
@@ -374,6 +360,19 @@ private:
     std::atomic<bool> shut;
     std::atomic<size_t> active_count;
 };
+
+std::unique_ptr<ThreadPoolExecutor> make_single_thread_executor() {
+    return conc11::make_unique<ThreadPoolExecutor>(1, 1, 0L);
+}
+
+std::unique_ptr<ThreadPoolExecutor> make_fixed_thread_pool(size_t num_threads) {
+    return conc11::make_unique<ThreadPoolExecutor>(num_threads, num_threads, 0L);
+}
+
+std::unique_ptr<ThreadPoolExecutor> make_cached_thread_pool() {
+    static const size_t MAX_THREADS = 1024;
+    return conc11::make_unique<ThreadPoolExecutor>(1, MAX_THREADS, 10 * 1000000000LL);
+}
 
 } // namespace conc11
 
