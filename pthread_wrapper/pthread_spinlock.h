@@ -1,10 +1,6 @@
 /*
  * pthread_spin_lock.h
- *
- *  Created on: 2016-12-30
- *      Author: jasonszang
  */
-
 #ifndef PTHREAD_WRAPPER_PTHREAD_SPINLOCK_H_
 #define PTHREAD_WRAPPER_PTHREAD_SPINLOCK_H_
 
@@ -16,7 +12,7 @@
 namespace conc11 {
 
 /**
- * @brief A thin-layer wrapper for pthread_spin, satisfies Lockable.
+ * A thin wrapper for pthread_spin, satisfies Lockable.
  */
 class PThreadSpinLockWrapper {
 public:

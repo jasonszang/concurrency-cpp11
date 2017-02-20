@@ -1,7 +1,7 @@
 /*
  * test_semaphore.h
- *
  */
+
 #ifndef TEST_SEMAPHORE_H_
 #define TEST_SEMAPHORE_H_
 
@@ -25,9 +25,10 @@ using std::unique_ptr;
 static const int TICKS = 5;
 static const int THREAD_NUMBER = 100;
 
+template <class SemType>
 class ThreadFunctor {
 public:
-    ThreadFunctor(int id, SimpleSemaphore<std::mutex> *sem) :
+    ThreadFunctor(int id, SemType* sem) :
             id(id), ctr(TICKS), sem(sem) {
     }
     void operator()() {
@@ -38,21 +39,22 @@ public:
             if (sem->available_permits() < 0) {
                 printf("ERROR! MINUS SEMAPHORES!!\n");
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+//            std::this_thread::sleep_for(std::chrono::milliseconds(50));
             sem->release(id);
         }
     }
 private:
     int id;
     int ctr;
-    SimpleSemaphore<std::mutex> *sem;
+    SemType* sem;
 };
 
 void test_semaphore() {
-    SimpleSemaphore<std::mutex> *sem = new SimpleSemaphore<std::mutex>(THREAD_NUMBER);
+    using SemType = QueuedSemaphore<std::mutex>;
+    SemType* sem = new SemType(THREAD_NUMBER);
     vector<unique_ptr<thread> > threads;
     for (int i = 0; i < THREAD_NUMBER; ++i) {
-        ThreadFunctor func(i + 1, sem);
+        ThreadFunctor<SemType> func(i + 1, sem);
         thread* curThread = new thread(func);
         threads.push_back(unique_ptr<thread>(curThread));
     }

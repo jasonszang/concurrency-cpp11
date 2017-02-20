@@ -4,6 +4,8 @@
 #ifndef UTIL_BITS_INVOKE_H_
 #define UTIL_BITS_INVOKE_H_
 
+#include <functional>
+#include <type_traits>
 #include "scope_guard.h"
 
 namespace conc11 {

@@ -21,7 +21,7 @@ void thread_func_b(Semaphore *sem, int id) {
 //        printf("Acquiring\n");
         SemaphoreGuard<conc11::QueuedSemaphore<std::mutex>> sg(*sem, i % 20);
 //        printf("Thread id: %d, Permits = %d, Waiting nodes = %d\n", id, bqs->permits, bqs->num_waiting_nodes());
-        std::this_thread::sleep_for(std::chrono::milliseconds(3));
+//        std::this_thread::sleep_for(std::chrono::milliseconds(3));
 //        printf("Releasing\n");
     }
 //    printf("Blocking thread %d out\n", id);
@@ -32,7 +32,7 @@ void thread_func_nb(Semaphore *sem, int id) {
     for (int i = 0; i < 100; ++i) {
         while (!sem->try_acquire_for(10, 0))
             ;
-        std::this_thread::sleep_for(std::chrono::milliseconds(3));
+//        std::this_thread::sleep_for(std::chrono::milliseconds(3));
 
         sem->release();
     }
@@ -47,17 +47,17 @@ void test_queued_semaphore() {
     for (int i = 0; i < NUM_THREADS; ++i) {
         blocking_threads.emplace_back(thread_func_b<SemaphoreType>, &sem, i);
     }
-//    std::vector<std::thread> non_blocking_threads;
-//    for (int i = NUM_THREADS; i < NUM_THREADS * 2; ++i) {
-//        non_blocking_threads.emplace_back(thread_func_nb, &bqs, i);
-//    }
+    std::vector<std::thread> non_blocking_threads;
+    for (int i = NUM_THREADS; i < NUM_THREADS * 2; ++i) {
+        non_blocking_threads.emplace_back(thread_func_nb<SemaphoreType>, &sem, i);
+    }
 
     for (int i = 0; i < NUM_THREADS; ++i) {
         blocking_threads[i].join();
     }
-//    for (int i = 0; i < NUM_THREADS; ++i) {
-//        non_blocking_threads[i].join();
-//    }
+    for (int i = 0; i < NUM_THREADS; ++i) {
+        non_blocking_threads[i].join();
+    }
 }
 
 } // namespace test

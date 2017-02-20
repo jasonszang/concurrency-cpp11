@@ -64,6 +64,10 @@ protected:
     ExecutorBase& operator=(const ExecutorBase&) = delete;
 };
 
+/**
+ * Thread pool executor with thread caching.
+ * Several helper functions are also provided for constructing preconfigured thread pools.
+ */
 class ThreadPoolExecutor : public ExecutorBase{
 public:
     ThreadPoolExecutor(size_t core_pool_size,
@@ -361,6 +365,8 @@ private:
     std::atomic<size_t> active_count;
 };
 
+// Helper functions for constructing thread pools.
+
 std::unique_ptr<ThreadPoolExecutor> make_single_thread_executor() {
     return conc11::make_unique<ThreadPoolExecutor>(1, 1, 0L);
 }
@@ -369,9 +375,18 @@ std::unique_ptr<ThreadPoolExecutor> make_fixed_thread_pool(size_t num_threads) {
     return conc11::make_unique<ThreadPoolExecutor>(num_threads, num_threads, 0L);
 }
 
+static const size_t MAX_CACHED_THREADS = 1024;
+
 std::unique_ptr<ThreadPoolExecutor> make_cached_thread_pool() {
-    static const size_t MAX_THREADS = 1024;
-    return conc11::make_unique<ThreadPoolExecutor>(1, MAX_THREADS, 10 * 1000000000LL);
+    return conc11::make_unique<ThreadPoolExecutor>(1, MAX_CACHED_THREADS, 10 * 1000000000LL);
+}
+
+template<class Rep, class Period>
+std::unique_ptr<ThreadPoolExecutor> make_cached_thread_pool(
+        const std::chrono::duration<Rep, Period> cached_thread_timeout_duration){
+    return conc11::make_unique<ThreadPoolExecutor>(1,
+            MAX_CACHED_THREADS,
+            std::chrono::duration_cast<std::chrono::nanoseconds>(cached_thread_timeout_duration));
 }
 
 } // namespace conc11

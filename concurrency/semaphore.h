@@ -1,8 +1,5 @@
 /*
  * semaphore.h
- *
- *  Created on: 2016-7-5
- *      Author: jasonszang
  */
 
 #ifndef CONCURRENCY_SEMAPHORE_H_
@@ -18,6 +15,9 @@
 
 namespace conc11 {
 
+/**
+ * A fair semaphore with an internal waiting queue.
+ */
 template<class LockType>
 class QueuedSemaphore {
 public:
@@ -343,6 +343,10 @@ private:
     std::map<unsigned int, std::size_t> request_record;
 };
 
+/**
+ * A simple unfair semaphore. Unfair semaphores may starve threads as the thread awaken from
+ * block waiting is randomly chosen.
+ */
 template<class LockType>
 class SimpleSemaphore {
 public:

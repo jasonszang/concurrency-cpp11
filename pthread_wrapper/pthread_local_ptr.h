@@ -1,8 +1,5 @@
 /**
  * pthread_specific_ptr.h
- *
- * @brief This is a C++ wrapper for pthread_specific-based thread local storage.
- *
  */
 #ifndef PTHREAD_WRAPPER_PTHREAD_LOCAL_PTR_H_
 #define PTHREAD_WRAPPER_PTHREAD_LOCAL_PTR_H_

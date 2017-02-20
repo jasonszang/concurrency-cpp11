@@ -1,8 +1,5 @@
 /*
  * spin_lock.h
- *
- *  Created on: 2016-12-26
- *      Author: jasonszang
  */
 
 #ifndef CONCURRENCY_SPINLOCK_H_
@@ -18,7 +15,7 @@ static const uint_fast16_t SPIN_CYCLES_BEFORE_YIELD = 100;
 static const uint_fast16_t SPIN_CYCLES_BEFORE_YIELD_FAIR = 100;
 
 /**
- * @brief A simple unfair spin lock that satisfies Lockable.
+ * A simple unfair spin lock that satisfies Lockable.
  */
 class SpinLock {
 public:
@@ -52,8 +49,8 @@ private:
 
 /**
  * A fair spin lock using ticket lock algorithm that satisfies BasicLockable.
- * This type of spin locks quickly become very slow when number of thread competing for the lock
- * becomes large, for example tens. Use SpinLock if fairness is not a huge concern.
+ * This type of spin locks tends to become very slow under heavy contention. Consider using
+ * SpinLock if fairness is not a huge concern.
  */
 class FairSpinLock {
 public:

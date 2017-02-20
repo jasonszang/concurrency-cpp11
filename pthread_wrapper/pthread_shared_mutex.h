@@ -12,6 +12,9 @@
 
 namespace conc11 {
 
+/**
+ * Wrapper for pthread_rwlock
+ */
 class PThreadSharedMutex {
 public:
     PThreadSharedMutex() {

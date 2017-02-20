@@ -1,8 +1,5 @@
 /*
  * test_spin_lock.h
- *
- *  Created on: 2016-12-30
- *      Author: jasonszang
  */
 
 #ifndef TEST_TEST_SPIN_LOCK_H_
